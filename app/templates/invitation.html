@@ -1,0 +1,133 @@
+{% extends base_template|default("base.html") %}
+{% block title %}Workspace Invitation{% endblock %}
+
+{% block content %}
+<div x-data="invitationPage('{{ token }}', {{ 'true' if authenticated else 'false' }})" x-init="init()" style="max-width:500px;margin:60px auto;text-align:center;">
+
+    <!-- Loading -->
+    <template x-if="loading">
+        <div>
+            <div class="spinner"></div>
+            <p class="text-muted mt-12" style="font-size:14px;">Loading invitation...</p>
+        </div>
+    </template>
+
+    <!-- Error -->
+    <template x-if="!loading && error">
+        <div class="card card-body" style="padding:48px 32px;">
+            <div class="empty-icon">
+                <svg width="28" height="28" fill="none" stroke="#f87171" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            </div>
+            <h2 class="text-primary mb-8" style="font-size:20px;font-weight:600;" x-text="error"></h2>
+            <p class="text-secondary mb-24" style="font-size:14px;">This invitation may have expired or already been used.</p>
+            <a href="/" class="btn-primary btn-sm">Go to Dashboard</a>
+        </div>
+    </template>
+
+    <!-- Not logged in -->
+    <template x-if="!loading && !error && !authenticated">
+        <div class="card card-body" style="padding:48px 32px;">
+            <div class="empty-icon">
+                <svg width="28" height="28" fill="none" stroke="var(--deep-teal)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            </div>
+            <h2 class="text-primary mb-8" style="font-size:20px;font-weight:600;">Workspace Invitation</h2>
+            <p class="text-secondary mb-24" style="font-size:14px;">Please sign in to accept this invitation.</p>
+            <a :href="'/login?next=/invitations/' + token" class="btn-primary btn-sm">Sign In</a>
+        </div>
+    </template>
+
+    <!-- Invitation details -->
+    <template x-if="!loading && !error && authenticated && invitation">
+        <div class="card card-body" style="padding:48px 32px;">
+            <div class="empty-icon">
+                <svg width="28" height="28" fill="none" stroke="var(--deep-teal)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            </div>
+            <p class="eyebrow">Workspace Invitation</p>
+            <h2 class="text-primary mb-8" style="font-size:22px;font-weight:600;" x-text="invitation.workspace_name"></h2>
+            <p class="text-secondary mb-8" style="font-size:14px;">
+                You've been invited as <strong class="text-teal" x-text="invitation.role"></strong>
+            </p>
+            <p class="text-muted mb-24" style="font-size:13px;" x-text="'Invited by ' + invitation.inviter_name"></p>
+
+            <div class="flex items-center justify-center gap-12">
+                <button @click="decline()" class="btn-secondary btn-sm" :disabled="processing">Decline</button>
+                <button @click="accept()" class="btn-primary btn-sm" :disabled="processing">
+                    <span x-show="!processing">Accept Invitation</span>
+                    <span x-show="processing" class="spinner-sm"></span>
+                </button>
+            </div>
+        </div>
+    </template>
+
+    <!-- Success -->
+    <template x-if="!loading && accepted">
+        <div class="card card-body" style="padding:48px 32px;">
+            <div class="empty-icon" style="background:rgba(16,185,129,.15);">
+                <svg width="28" height="28" fill="none" stroke="var(--deep-teal)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <h2 class="text-primary mb-8" style="font-size:20px;font-weight:600;">You're in!</h2>
+            <p class="text-secondary mb-24" style="font-size:14px;">You've joined the workspace.</p>
+            <a :href="'/workspaces/' + workspaceId" class="btn-primary btn-sm">Open Workspace</a>
+        </div>
+    </template>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function invitationPage(token, authenticated) {
+    return {
+        token,
+        authenticated,
+        invitation: null,
+        loading: true,
+        error: null,
+        processing: false,
+        accepted: false,
+        workspaceId: null,
+
+        async init() {
+            if (!this.authenticated) {
+                this.loading = false;
+                return;
+            }
+            try {
+                // Try to get invitation info by attempting to accept
+                // We use a lightweight check first
+                this.invitation = { workspace_name: 'Workspace', role: 'viewer', inviter_name: '' };
+                // There's no separate info endpoint, so show generic invite UI
+                this.loading = false;
+            } catch (e) {
+                this.error = e.message || 'Invitation not found';
+                this.loading = false;
+            }
+        },
+
+        async accept() {
+            this.processing = true;
+            try {
+                const res = await apiCall(`/api/workspaces/invitations/${this.token}/accept`);
+                this.workspaceId = res.workspace_id;
+                this.accepted = true;
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+            this.processing = false;
+        },
+
+        async decline() {
+            if (!confirm('Decline this invitation?')) return;
+            this.processing = true;
+            try {
+                await apiCall(`/api/workspaces/invitations/${this.token}/decline`);
+                showToast('Invitation declined');
+                navigateTo('/');
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+            this.processing = false;
+        },
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,583 @@
+{% extends base_template|default("base.html") %}
+{% block title %}LAWA Scouts — Dashboard{% endblock %}
+
+{% block content %}
+<div x-data="dashboard()" x-init="init()">
+
+    <!-- Loading -->
+    <template x-if="loading">
+        <div style="text-align:center;padding:80px 0;">
+            <div class="spinner"></div>
+            <p class="text-muted mt-12" style="font-size:14px;">Loading scouts...</p>
+        </div>
+    </template>
+
+    <!-- Empty State -->
+    <template x-if="scouts.length === 0 && !loading">
+        <div style="max-width:520px;margin:80px auto;text-align:center;">
+            <div class="empty-icon" style="margin-bottom:20px;">
+                <svg width="28" height="28" fill="none" stroke="var(--deep-teal)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </div>
+            <h2 style="font-family:'Spectral',serif;font-size:28px;font-weight:300;color:var(--text-primary);margin-bottom:8px;">No scouts yet</h2>
+            <p class="text-secondary" style="font-size:14px;margin-bottom:28px;">Create your first scout to start monitoring the web.</p>
+            <div class="flex flex-wrap items-center justify-center gap-12">
+                <a href="/scouts/new" class="btn-primary">Create Your First Scout</a>
+            </div>
+        </div>
+    </template>
+
+    <!-- Main Layout: Sidebar + Content -->
+    <template x-if="scouts.length > 0 && !loading">
+        <div class="dash-layout">
+
+            <!-- ═══ LEFT PANEL: Scout List ═══ -->
+            <div class="dash-sidebar" :class="{ 'dash-mobile-hidden': !mobileShowList }">
+                <!-- Search -->
+                <div style="padding:20px 20px 12px;">
+                    <div style="position:relative;">
+                        <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:.4;" width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <input type="text" x-model="searchQuery" class="input" placeholder="Search scouts..."
+                               style="height:38px;font-size:13px;padding-left:34px;border-radius:8px;background:var(--surface);border-color:transparent;"
+                               onfocus="this.style.borderColor='var(--border-light)'" onblur="this.style.borderColor='transparent'" />
+                    </div>
+                    <!-- Filter tabs -->
+                    <div style="display:flex;gap:2px;margin-top:10px;">
+                        <button @click="listFilter = 'all'"
+                                class="dash-filter-btn" :class="listFilter === 'all' ? 'dash-filter-active' : ''">All
+                            <span class="dash-filter-count" x-text="scouts.length"></span>
+                        </button>
+                        <button @click="listFilter = 'active'"
+                                class="dash-filter-btn" :class="listFilter === 'active' ? 'dash-filter-active' : ''">Active
+                            <span class="dash-filter-count" x-text="scouts.filter(s => s.status === 'active').length"></span>
+                        </button>
+                        <button @click="listFilter = 'paused'"
+                                class="dash-filter-btn" :class="listFilter === 'paused' ? 'dash-filter-active' : ''">Paused</button>
+                    </div>
+                </div>
+
+                <!-- Workspaces Section (collapsible, above scout list) -->
+                <template x-if="workspaces.length > 0 || true">
+                    <div class="dash-ws-section">
+                        <button @click="showWorkspaces = !showWorkspaces" class="dash-ws-toggle">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                <span>Workspaces</span>
+                                <template x-if="workspaces.length > 0">
+                                    <span class="dash-filter-count" x-text="workspaces.length"></span>
+                                </template>
+                            </div>
+                            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                 style="transition:transform .2s;" :style="showWorkspaces ? 'transform:rotate(180deg)' : ''">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                        <div x-show="showWorkspaces" x-transition.duration.150ms class="dash-ws-list">
+                            <template x-for="ws in workspaces" :key="ws.id">
+                                <a :href="'/workspaces/' + ws.id" class="dash-ws-item">
+                                    <div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(16,185,129,.05));display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                        <svg width="13" height="13" fill="none" stroke="var(--mint)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                    </div>
+                                    <div style="flex:1;min-width:0;">
+                                        <span class="text-primary text-truncate" style="font-size:13px;font-weight:500;display:block;" x-text="ws.name"></span>
+                                    </div>
+                                    <svg width="12" height="12" fill="none" stroke="var(--text-muted)" viewBox="0 0 24 24" style="flex-shrink:0;opacity:.5;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                </a>
+                            </template>
+                            <button @click="showCreateWorkspace = true" class="dash-ws-item" style="width:100%;border:none;background:transparent;font-family:'Inter',sans-serif;cursor:pointer;color:var(--text-muted);">
+                                <div style="width:28px;height:28px;border-radius:8px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                </div>
+                                <span style="font-size:13px;font-weight:500;">New workspace</span>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Scout List -->
+                <div class="dash-list">
+                    <template x-for="scout in filteredScouts" :key="scout.id">
+                        <a :href="'/scouts/' + scout.id"
+                           class="dash-item"
+                           :class="selectedId === scout.id ? 'dash-item-active' : ''"
+                           @mouseenter="selectedId = scout.id"
+                           @click="if(window.innerWidth <= 768){ $event.preventDefault(); selectedId = scout.id; mobileShowList = false; }">
+                            <div style="flex:1;min-width:0;">
+                                <div class="flex items-center gap-6 mb-2">
+                                    <span class="text-primary text-truncate" style="font-size:13.5px;font-weight:600;" x-text="scout.name"></span>
+                                    <template x-if="scout.workspace_id">
+                                        <span style="flex-shrink:0;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:500;background:rgba(16,185,129,.08);color:var(--mint);"
+                                              x-text="getWorkspaceName(scout.workspace_id)"></span>
+                                    </template>
+                                </div>
+                                <p class="text-muted text-truncate" style="font-size:12px;line-height:1.4;" x-text="scout.topic"></p>
+                            </div>
+                            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;margin-left:12px;">
+                                <template x-if="scout.status === 'active' || scout.status === 'once'">
+                                    <svg width="14" height="14" fill="none" stroke="var(--badge-green)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                </template>
+                                <template x-if="scout.status === 'paused'">
+                                    <svg width="14" height="14" fill="none" stroke="var(--text-muted)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6"/></svg>
+                                </template>
+                                <span class="text-muted" style="font-size:11px;font-family:'IBM Plex Mono',monospace;" x-text="getScoutReportCount(scout.id)"></span>
+                            </div>
+                        </a>
+                    </template>
+                    <template x-if="filteredScouts.length === 0">
+                        <div style="padding:32px 16px;text-align:center;">
+                            <p class="text-muted" style="font-size:13px;">No scouts match your search.</p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- ═══ RIGHT PANEL: Content ═══ -->
+            <div class="dash-content" :class="{ 'dash-mobile-hidden': mobileShowList }">
+                <!-- Mobile back button (visible only on mobile when a scout is selected) -->
+                <button class="dash-mobile-back" @click="mobileShowList = true; selectedId = null">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    Back to list
+                </button>
+
+                <!-- Selected scout preview -->
+                <template x-if="selectedScout">
+                    <div class="dash-preview" style="animation:fadeIn .2s ease;">
+                        <!-- Scout header -->
+                        <div style="margin-bottom:28px;">
+                            <div class="flex items-center gap-8 mb-8">
+                                <span :class="selectedScout.status === 'active' ? 'status-active' : (selectedScout.status === 'once' ? 'status-active' : 'status-paused')"
+                                      style="font-size:11px;padding:2px 10px;"
+                                      x-text="selectedScout.status === 'once' ? 'one-time' : selectedScout.status"></span>
+                                <span class="text-muted" style="font-size:12px;" x-text="selectedScout.last_run_at ? 'Last run ' + formatTimeRelative(selectedScout.last_run_at) : 'Not run yet'"></span>
+                            </div>
+                            <h1 class="dash-scout-title" x-text="selectedScout.name"></h1>
+                            <p class="text-secondary" style="font-size:14px;line-height:1.6;" x-text="selectedScout.topic"></p>
+                        </div>
+
+                        <!-- Quick stats for this scout -->
+                        <div class="dash-stats-grid">
+                            <div class="dash-stat-card">
+                                <span class="text-muted dash-stat-label">Reports</span>
+                                <p class="text-primary" style="font-size:24px;font-family:'Spectral',serif;font-weight:300;margin-top:4px;" x-text="getScoutReportCount(selectedScout.id)"></p>
+                            </div>
+                            <div class="dash-stat-card">
+                                <span class="text-muted dash-stat-label">Schedule</span>
+                                <p class="text-primary" style="font-size:15px;font-weight:500;margin-top:8px;" x-text="selectedScout.status === 'once' ? 'One-time' : 'Every ' + selectedScout.schedule_minutes + ' min'"></p>
+                            </div>
+                            <div class="dash-stat-card">
+                                <span class="text-muted dash-stat-label">Status</span>
+                                <p class="text-primary" style="font-size:15px;font-weight:500;margin-top:8px;text-transform:capitalize;" x-text="selectedScout.status"></p>
+                            </div>
+                            <div class="dash-stat-card">
+                                <span class="text-muted dash-stat-label">Created</span>
+                                <p class="text-primary" style="font-size:15px;font-weight:500;margin-top:8px;" x-text="selectedScout.created_at ? new Date(selectedScout.created_at).toLocaleDateString() : '—'"></p>
+                            </div>
+                        </div>
+
+                        <!-- Latest report preview -->
+                        <template x-if="getLatestReport(selectedScout.id)">
+                            <div class="dash-report-card">
+                                <p class="section-label mb-16">Latest Report</p>
+                                <div style="margin-bottom:8px;">
+                                    <p style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;"
+                                       x-text="formatRunDate(getLatestReport(selectedScout.id).created_at)"></p>
+                                    <h3 class="text-primary" style="font-size:18px;font-weight:600;line-height:1.35;margin-bottom:10px;" x-text="getLatestReport(selectedScout.id).title"></h3>
+                                </div>
+                                <p class="text-secondary" style="font-size:14px;line-height:1.7;" x-text="getLatestReport(selectedScout.id).summary"></p>
+                                <a :href="'/scouts/' + selectedScout.id"
+                                   style="display:inline-flex;align-items:center;gap:6px;margin-top:20px;font-size:13px;font-weight:500;color:var(--mint);text-decoration:none;transition:opacity .15s;"
+                                   onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
+                                    View full report
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                </a>
+                            </div>
+                        </template>
+
+                        <!-- No reports yet -->
+                        <template x-if="!getLatestReport(selectedScout.id)">
+                            <div class="dash-report-card">
+                                <p class="text-muted" style="font-size:14px;">No reports generated yet.</p>
+                                <a :href="'/scouts/' + selectedScout.id"
+                                   style="display:inline-flex;align-items:center;gap:6px;margin-top:12px;font-size:13px;font-weight:500;color:var(--mint);text-decoration:none;">
+                                    Go to scout
+                                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                </a>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- No scout selected (fallback) -->
+                <template x-if="!selectedScout">
+                    <div style="display:flex;align-items:center;justify-content:center;min-height:300px;">
+                        <p class="text-muted" style="font-size:14px;">Select a scout to preview</p>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </template>
+
+    <!-- Create Workspace Modal -->
+    <template x-if="showCreateWorkspace">
+        <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;"
+             @click.self="showCreateWorkspace = false" @keydown.escape.window="showCreateWorkspace = false">
+            <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;width:100%;max-width:420px;box-shadow:0 24px 64px rgba(0,0,0,.3);">
+                <h3 class="text-primary mb-16" style="font-size:18px;font-weight:600;">Create Workspace</h3>
+                <input x-model="newWorkspaceName" type="text" class="input mb-16" placeholder="Workspace name" @keydown.enter="createWorkspace()" autofocus />
+                <div class="flex items-center justify-end gap-10">
+                    <button @click="showCreateWorkspace = false" class="btn-secondary btn-sm">Cancel</button>
+                    <button @click="createWorkspace()" :disabled="!newWorkspaceName.trim()" class="btn-primary btn-sm">Create</button>
+                </div>
+            </div>
+        </div>
+    </template>
+</div>
+
+<style>
+    /* Remove .main-content constraints for full-page dashboard */
+    .main-content:has(.dash-layout) {
+        max-width: none;
+        padding: 0;
+    }
+
+    /* ── Layout ── */
+    .dash-layout {
+        display: flex;
+        width: 100%;
+        height: calc(100vh - 65px);
+    }
+    .dash-sidebar {
+        width: 340px;
+        min-width: 280px;
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        background: var(--card);
+        flex-shrink: 0;
+        border-radius: 0 20px 20px 0;
+        overflow: hidden;
+    }
+    .dash-content {
+        flex: 1;
+        padding: 48px 72px;
+        min-width: 0;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .dash-preview {
+        width: 100%;
+        max-width: 840px;
+    }
+    .dash-scout-title {
+        font-family: 'Spectral', serif;
+        font-size: clamp(24px, 3vw, 36px);
+        font-weight: 300;
+        color: var(--text-primary);
+        line-height: 1.2;
+        margin-bottom: 8px;
+        letter-spacing: -.5px;
+    }
+    .dash-mobile-back {
+        display: none; /* hidden on desktop */
+    }
+
+    /* ── Scout List ── */
+    .dash-list {
+        flex: 1;
+        overflow-y: auto;
+        scrollbar-width: thin;
+    }
+    .dash-list::-webkit-scrollbar { width: 4px; }
+    .dash-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .dash-item {
+        display: flex;
+        align-items: center;
+        padding: 12px 16px;
+        margin: 4px 10px;
+        border-radius: 10px;
+        text-decoration: none;
+        color: inherit;
+        transition: background .12s;
+        cursor: pointer;
+    }
+    .dash-item:hover { background: var(--surface); }
+    .dash-item-active {
+        background: var(--surface);
+        box-shadow: inset 3px 0 0 var(--deep-teal);
+    }
+
+    /* ── Stats Grid ── */
+    .dash-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 28px;
+        padding-bottom: 28px;
+        border-bottom: 1px solid var(--border);
+    }
+    .dash-stat-card {
+        padding: 16px 20px;
+        border-radius: 14px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+    }
+    .dash-stat-label {
+        font-size: 11px;
+        font-family: 'IBM Plex Mono', monospace;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+    }
+
+    /* ── Report Card ── */
+    .dash-report-card {
+        padding: 28px;
+        border-radius: 16px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+    }
+
+    /* ── Workspaces ── */
+    .dash-ws-section {
+        border-bottom: 1px solid var(--border);
+    }
+    .dash-ws-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        padding: 10px 20px;
+        border: none;
+        background: transparent;
+        font-family: 'Inter', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+        transition: color .15s;
+    }
+    .dash-ws-toggle:hover { color: var(--text-secondary); }
+    .dash-ws-list { padding: 0 12px 10px; }
+    .dash-ws-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        text-decoration: none;
+        color: inherit;
+        transition: background .12s;
+    }
+    .dash-ws-item:hover { background: var(--surface); }
+
+    /* ── Filter Buttons ── */
+    .dash-filter-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        border: none;
+        background: transparent;
+        font-family: 'Inter', sans-serif;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all .12s;
+    }
+    .dash-filter-btn:hover { color: var(--text-secondary); background: var(--surface); }
+    .dash-filter-active {
+        color: var(--text-primary) !important;
+        background: var(--surface) !important;
+        font-weight: 600;
+    }
+    .dash-filter-count {
+        font-size: 10px;
+        font-family: 'IBM Plex Mono', monospace;
+        opacity: .6;
+    }
+
+    /* ══════════════════════════════════════
+       RESPONSIVE: Tablet (769px - 1024px)
+       ══════════════════════════════════════ */
+    @media (max-width: 1024px) {
+        .dash-sidebar { width: 300px; min-width: 260px; }
+        .dash-content { padding: 36px 40px; }
+        .dash-stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    /* ══════════════════════════════════════
+       RESPONSIVE: Mobile (≤768px)
+       ══════════════════════════════════════ */
+    @media (max-width: 768px) {
+        .dash-layout {
+            flex-direction: column;
+            height: auto;
+            min-height: calc(100vh - 65px);
+        }
+        .dash-sidebar {
+            width: 100%;
+            min-width: 0;
+            flex: 1;
+            border-right: none;
+            border-bottom: 1px solid var(--border);
+            border-radius: 0;
+        }
+        .dash-content {
+            width: 100%;
+            padding: 20px 16px;
+            flex: 1;
+        }
+        .dash-preview { max-width: none; }
+        .dash-scout-title { font-size: 22px; }
+        .dash-stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .dash-stat-card { padding: 12px 14px; }
+        .dash-report-card { padding: 16px; }
+
+        /* Mobile: toggle between list and content */
+        .dash-mobile-hidden { display: none !important; }
+        .dash-mobile-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 0;
+            margin-bottom: 12px;
+            border: none;
+            background: transparent;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--mint);
+            cursor: pointer;
+        }
+    }
+
+    /* ══════════════════════════════════════
+       RESPONSIVE: Small mobile (≤480px)
+       ══════════════════════════════════════ */
+    @media (max-width: 480px) {
+        .dash-content { padding: 16px 12px; }
+        .dash-stats-grid {
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .dash-stat-card { padding: 10px 12px; }
+        .dash-stat-label { font-size: 10px; }
+        .dash-item { padding: 10px 12px; margin: 3px 8px; }
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function dashboard() {
+    return {
+        scouts: [], recentReports: [], totalReports: 0, loading: true,
+        workspaces: [], showCreateWorkspace: false, newWorkspaceName: '',
+        showWorkspaces: false,
+        mobileShowList: true,
+        searchQuery: '', listFilter: 'all', selectedId: null,
+        _reportCounts: {},
+        _latestReports: {},
+
+        get filteredScouts() {
+            let list = this.scouts;
+            if (this.listFilter === 'active') list = list.filter(s => s.status === 'active' || s.status === 'once');
+            else if (this.listFilter === 'paused') list = list.filter(s => s.status === 'paused');
+            if (this.searchQuery.trim()) {
+                const q = this.searchQuery.toLowerCase();
+                list = list.filter(s => (s.name || '').toLowerCase().includes(q) || (s.topic || '').toLowerCase().includes(q));
+            }
+            return list;
+        },
+
+        get selectedScout() {
+            if (!this.selectedId) return this.scouts[0] || null;
+            return this.scouts.find(s => s.id === this.selectedId) || this.scouts[0] || null;
+        },
+
+        async init() {
+            try {
+                // Batched: single request gets scouts + report counts + latest report info
+                const [scouts, workspaces] = await Promise.all([
+                    apiCall('/api/scouts/summary', 'GET', null, { noCache: true }),
+                    apiCall('/api/workspaces', 'GET', null, { noCache: true }),
+                ]);
+                this.scouts = scouts;
+                this.workspaces = workspaces;
+                if (scouts.length > 0) this.selectedId = scouts[0].id;
+
+                // Extract report metadata from summary (already embedded — no N+1!)
+                for (const scout of this.scouts) {
+                    this._reportCounts[scout.id] = scout.report_count || 0;
+                    if (scout.latest_report_title) {
+                        this._latestReports[scout.id] = {
+                            title: scout.latest_report_title,
+                            created_at: scout.latest_report_date,
+                            summary: '',
+                        };
+                    }
+                }
+            } catch (e) { showToast(e.message, 'error'); }
+            this.loading = false;
+        },
+
+        getWorkspaceName(wsId) {
+            const ws = this.workspaces.find(w => w.id === wsId);
+            return ws ? ws.name : 'Workspace';
+        },
+        getScoutReportCount(scoutId) {
+            return this._reportCounts[scoutId] || 0;
+        },
+        getLatestReport(scoutId) {
+            return this._latestReports[scoutId] || null;
+        },
+
+        async createWorkspace() {
+            const name = this.newWorkspaceName.trim();
+            if (!name) return;
+            try {
+                const ws = await apiCall('/api/workspaces', 'POST', { name });
+                this.workspaces.unshift(ws);
+                this.showCreateWorkspace = false;
+                this.newWorkspaceName = '';
+                showToast('Workspace created!');
+            } catch (e) { showToast(e.message, 'error'); }
+        },
+
+        formatTime(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+        },
+        formatTimeRelative(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            const now = new Date();
+            const diff = now - d;
+            const mins = Math.floor(diff / 60000);
+            if (mins < 1) return 'just now';
+            if (mins < 60) return mins + 'm ago';
+            const hrs = Math.floor(mins / 60);
+            if (hrs < 24) return hrs + 'h ago';
+            const days = Math.floor(hrs / 24);
+            if (days < 7) return days + 'd ago';
+            return d.toLocaleDateString();
+        },
+        formatRunDate(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+            const h = d.getHours(); const ampm = h >= 12 ? 'PM' : 'AM'; const h12 = h % 12 || 12;
+            return `${months[d.getMonth()]} ${String(d.getDate()).padStart(2,'0')}, ${d.getFullYear()} AT ${h12}:${String(d.getMinutes()).padStart(2,'0')}${ampm}`;
+        }
+    }
+}
+</script>
+{% endblock %}

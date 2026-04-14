@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}LAWA Scouts{% endblock %}</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@200;300;400&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/app.css?v=1" />
+    <script>
+        // Apply saved theme immediately to avoid flash
+        (function() {
+            var saved = localStorage.getItem('lawa-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', saved);
+        })();
+    </script>
+</head>
+<body>
+    <!-- SPA Progress Bar -->
+    <div id="spa-progress"></div>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="navbar-inner">
+            <a href="/" class="navbar-brand">
+                <div class="navbar-logo">
+                    <svg width="20" height="20" fill="none" stroke="#fff" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                </div>
+                <span class="navbar-title">LAWA<span> Scouts</span></span>
+            </a>
+            <div style="display:flex;align-items:center;gap:8px;" x-data="userNav()" x-init="init()">
+                <!-- Theme toggle -->
+                <button onclick="toggleTheme()" title="Toggle light/dark mode"
+                        style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text-secondary);transition:all .15s;"
+                        onmouseover="this.style.borderColor='var(--border-light)'"
+                        onmouseout="this.style.borderColor='var(--border)'">
+                    <svg class="theme-icon-dark" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display:none;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                    <svg class="theme-icon-light" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display:none;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                </button>
+                <template x-if="user">
+                    <a href="/collections" title="Collections"
+                       style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);transition:all .15s;text-decoration:none;"
+                       onmouseover="this.style.borderColor='var(--border-light)'"
+                       onmouseout="this.style.borderColor='var(--border)'">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+                    </a>
+                </template>
+                <template x-if="user">
+                    <a href="/scouts/new" class="btn-primary btn-primary-sm navbar-new-scout">+ New Scout</a>
+                </template>
+                <!-- Notification Bell -->
+                <template x-if="user">
+                    <div style="position:relative;" x-data="notifBell()" x-init="startPolling()">
+                        <button @click="togglePanel()"
+                                style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text-secondary);transition:all .15s;position:relative;"
+                                onmouseover="this.style.borderColor='var(--border-light)'"
+                                onmouseout="this.style.borderColor='var(--border)'">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                            <span x-show="unreadCount > 0" x-text="unreadCount > 9 ? '9+' : unreadCount" x-cloak
+                                  style="position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;border-radius:8px;background:#ef4444;color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1;"></span>
+                        </button>
+                        <div x-show="showPanel" @click.away="showPanel=false" x-cloak
+                             style="position:absolute;right:0;top:calc(100% + 8px);width:360px;background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.3);overflow:hidden;z-index:100;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);">
+                                <span style="font-size:14px;font-weight:600;color:var(--text-primary);">Notifications</span>
+                                <button x-show="unreadCount > 0" @click="markAllRead()"
+                                        style="border:none;background:none;font-size:12px;color:var(--mint);cursor:pointer;font-family:'Inter',sans-serif;font-weight:500;">Mark all read</button>
+                            </div>
+                            <div style="max-height:400px;overflow-y:auto;">
+                                <template x-for="n in notifications" :key="n.id">
+                                    <div @click="clickNotif(n)" class="notif-item" :class="!n.is_read && 'notif-item-unread'">
+                                        <div class="notif-icon" x-html="notifIcon(n.type)" :style="notifIconStyle(n.type)"></div>
+                                        <div class="notif-text">
+                                            <p class="notif-title" x-text="n.title"></p>
+                                            <p x-show="n.body" class="notif-body" x-text="n.body"></p>
+                                            <p class="notif-time" x-text="timeAgo(n.created_at)"></p>
+                                        </div>
+                                        <div x-show="!n.is_read" class="notif-dot"></div>
+                                    </div>
+                                </template>
+                                <div x-show="notifications.length === 0" style="padding:32px 16px;text-align:center;">
+                                    <p style="font-size:13px;color:var(--text-muted);">No notifications yet</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="user">
+                    <div style="position:relative;">
+                        <button @click="open = !open"
+                                style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text-secondary);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;transition:all .15s;"
+                                onmouseover="this.style.borderColor='var(--border-light)'"
+                                onmouseout="this.style.borderColor='var(--border)'">
+                            <div style="width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;" x-text="user.email[0].toUpperCase()"></div>
+                            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div x-show="open" @click.away="open = false" x-cloak
+                             style="position:absolute;right:0;top:calc(100% + 8px);min-width:200px;background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.3);padding:8px;z-index:100;">
+                            <div style="padding:10px 12px;border-bottom:1px solid var(--border);margin-bottom:4px;">
+                                <div style="font-size:13px;font-weight:600;color:var(--text-primary);" x-text="user.name || user.email.split('@')[0]"></div>
+                                <div style="font-size:11px;color:var(--text-muted);margin-top:2px;" x-text="user.email"></div>
+                            </div>
+                            <template x-if="user && user.is_admin">
+                                <a href="/admin"
+                                   style="display:block;padding:8px 12px;border-radius:8px;font-family:'Inter',sans-serif;font-size:13px;color:var(--text-secondary);text-decoration:none;transition:all .15s;"
+                                   onmouseover="this.style.background='var(--surface)';this.style.color='var(--mint)'"
+                                   onmouseout="this.style.background='transparent';this.style.color='var(--text-secondary)'">
+                                    <span style="display:flex;align-items:center;gap:8px;">
+                                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7"/></svg>
+                                        Admin Dashboard
+                                    </span>
+                                </a>
+                            </template>
+                            <button @click="logout()"
+                                    style="width:100%;padding:8px 12px;border:none;background:transparent;border-radius:8px;font-family:'Inter',sans-serif;font-size:13px;color:var(--text-secondary);cursor:pointer;text-align:left;transition:all .15s;"
+                                    onmouseover="this.style.background='var(--surface)';this.style.color='#f87171'"
+                                    onmouseout="this.style.background='transparent';this.style.color='var(--text-secondary)'">
+                                Sign out
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Toast Container -->
+    <div id="toast-container" style="position:fixed;top:24px;right:24px;z-index:50;display:flex;flex-direction:column;gap:8px;"></div>
+
+    <!-- External JS (cached by browser) -->
+    <script src="/static/app.js?v=2"></script>
+    <script src="/static/ws.js?v=1"></script>
+    <script src="/static/router.js?v=1"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

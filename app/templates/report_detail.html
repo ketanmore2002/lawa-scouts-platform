@@ -1,0 +1,233 @@
+{% extends base_template|default("base.html") %}
+{% block title %}Report{% endblock %}
+
+{% block content %}
+<div x-data="reportDetail('{{ scout_id }}', '{{ report_id }}')" x-init="init()">
+
+    <a :href="'/scouts/' + scoutId" class="back-link">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        Back to Scout
+    </a>
+
+    <!-- Loading -->
+    <template x-if="loading">
+        <div style="text-align:center;padding:48px 0;">
+            <div class="spinner"></div>
+        </div>
+    </template>
+
+    <template x-if="!loading && report">
+        <div>
+            <!-- Header -->
+            <div class="mb-32">
+                <p class="eyebrow" x-text="'LAWA Scouts Report \u00b7 ' + (scout ? scout.topic : '')"></p>
+                <h1 class="page-title" x-text="report.title"></h1>
+                <p class="text-secondary mt-8" style="font-size:14px;opacity:.75;">
+                    <span x-text="formatTime(report.created_at)"></span>
+                    <span style="margin:0 8px;opacity:.4;">|</span>
+                    <span x-text="'Scout: ' + (scout ? scout.name : '')"></span>
+                </p>
+            </div>
+
+            <!-- Summary -->
+            <div class="card card-body mb-24">
+                <p class="section-label">Summary</p>
+                <p class="text-secondary" style="line-height:1.7;font-size:15px;" x-text="report.summary"></p>
+            </div>
+
+            <!-- Structured View -->
+            <template x-if="isStructured">
+                <div>
+                    <!-- Stats Cards -->
+                    <template x-if="sd.stats && sd.stats.length > 0">
+                        <div class="flex flex-wrap gap-16 mb-24">
+                            <template x-for="(stat, si) in sd.stats" :key="si">
+                                <div class="card card-body" style="flex:1 1 160px;min-width:140px;">
+                                    <div class="stat-value" :style="'color:' + statHex(stat.color)" x-text="stat.value"></div>
+                                    <div class="stat-label" x-text="stat.label"></div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- Controls -->
+                    <div class="flex flex-wrap items-center gap-12 mb-20">
+                        <div style="position:relative;flex:1 1 200px;min-width:0;">
+                            <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);opacity:.45;pointer-events:none;" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10ZM14 14l-3-3" stroke="currentColor" style="opacity:.45" stroke-width="1.5" stroke-linecap="round"/>
+                            </svg>
+                            <input type="text" x-model="searchQuery" @input="applyFilters()" class="input input-sm input-search" placeholder="Search..." />
+                        </div>
+                        <template x-for="fc in filterCols" :key="fc">
+                            <select x-model="activeFilters[fc]" @change="applyFilters()" class="input" style="width:auto;height:40px;font-size:13px;padding:0 12px;">
+                                <option value="" x-text="'All ' + getColLabel(fc)"></option>
+                                <template x-for="opt in filterOpts[fc]" :key="opt">
+                                    <option :value="opt" x-text="opt"></option>
+                                </template>
+                            </select>
+                        </template>
+                        <button @click="resetFilters()" class="btn-secondary btn-sm">Reset</button>
+                        <span class="mono-label nowrap ml-auto" x-text="filteredRows.length + ' of ' + allRows.length + ' shown'"></span>
+                    </div>
+
+                    <!-- Data Table -->
+                    <div class="card mb-24" style="overflow:hidden;">
+                        <div style="overflow-x:auto;max-height:600px;">
+                            <table class="report-table" style="min-width:700px;">
+                                <thead>
+                                    <tr>
+                                        <template x-for="col in sd.columns" :key="col.key">
+                                            <th @click="sortBy(col.key)">
+                                                <span x-text="col.label"></span>
+                                                <span x-show="sortCol === col.key" x-text="sortDir === 1 ? ' \u2191' : ' \u2193'" style="opacity:.7;"></span>
+                                            </th>
+                                        </template>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="(row, ri) in filteredRows" :key="ri">
+                                        <tr>
+                                            <template x-for="col in sd.columns" :key="col.key + '-' + ri">
+                                                <td>
+                                                    <template x-if="col.type === 'text' || col.type === 'date'">
+                                                        <span x-text="row[col.key] || '\u2014'"></span>
+                                                    </template>
+                                                    <template x-if="col.type === 'badge'">
+                                                        <span class="r-badge" :class="badgeClass(row[col.key])" x-text="row[col.key] || '\u2014'"></span>
+                                                    </template>
+                                                    <template x-if="col.type === 'tags'">
+                                                        <div class="flex flex-wrap">
+                                                            <template x-for="tag in (Array.isArray(row[col.key]) ? row[col.key] : [])" :key="tag">
+                                                                <span class="r-tag" x-text="tag"></span>
+                                                            </template>
+                                                            <span x-show="!Array.isArray(row[col.key]) || row[col.key].length === 0" class="text-muted">\u2014</span>
+                                                        </div>
+                                                    </template>
+                                                    <template x-if="col.type === 'link'">
+                                                        <span>
+                                                            <a x-show="row[col.key]" :href="row[col.key]" target="_blank" rel="noopener noreferrer" class="r-apply-btn">
+                                                                <span x-text="row.link_label || 'Visit'"></span>
+                                                                <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 8L8 2M8 2H4M8 2V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                                            </a>
+                                                            <span x-show="!row[col.key]" class="text-muted">\u2014</span>
+                                                        </span>
+                                                    </template>
+                                                </td>
+                                            </template>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div x-show="filteredRows.length === 0" class="text-muted" style="text-align:center;padding:48px 24px;font-size:14px;">
+                            <p style="font-size:32px;opacity:.3;margin-bottom:8px;">&#9906;</p>
+                            <p>No results match your search.</p>
+                            <p style="font-size:12px;opacity:.6;margin-top:4px;">Try adjusting your filters or search terms.</p>
+                        </div>
+                    </div>
+
+                    <!-- Insights -->
+                    <template x-if="sd.insights && sd.insights.length > 0">
+                        <div class="card card-body mb-24">
+                            <p class="section-label">Key Insights</p>
+                            <div class="flex flex-col gap-12">
+                                <template x-for="(insight, ii) in sd.insights" :key="ii">
+                                    <div class="flex items-start gap-12 text-secondary" style="font-size:14px;line-height:1.65;">
+                                        <span class="insight-number" x-text="ii + 1"></span>
+                                        <span x-text="insight"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
+
+            <!-- Text Fallback -->
+            <template x-if="!isStructured">
+                <div class="card card-body mb-24">
+                    <p class="section-label">Full Report</p>
+                    <div class="text-fallback" x-html="formatMarkdown(report.raw_response || '')"></div>
+                </div>
+            </template>
+
+            <!-- Sources -->
+            <template x-if="citations.length > 0">
+                <div class="card card-body">
+                    <p class="section-label">Sources</p>
+                    <div class="flex flex-col gap-8">
+                        <template x-for="(cite, ci) in citations" :key="ci">
+                            <a :href="cite.url" target="_blank" rel="noopener" class="source-link">
+                                <div class="source-number" x-text="ci + 1"></div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-primary text-truncate" style="font-size:13px;font-weight:500;" x-text="cite.title || cite.url"></p>
+                                    <p class="text-muted text-truncate" style="font-size:11px;" x-text="cite.url"></p>
+                                </div>
+                                <svg width="14" height="14" fill="none" stroke="var(--text-muted)" viewBox="0 0 24 24" class="shrink-0"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                            </a>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </template>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function reportDetail(scoutId, reportId) {
+    return {
+        scoutId, reportId, report: null, scout: null, loading: true,
+        sd: null, isStructured: false,
+        allRows: [], filteredRows: [], searchQuery: '',
+        sortCol: null, sortDir: 1,
+        activeFilters: {}, filterCols: [], filterOpts: {},
+        citations: [],
+
+        async init() {
+            try {
+                this.report = await apiCall(`/api/reports/${this.reportId}`);
+                this.scout  = await apiCall(`/api/scouts/${this.scoutId}`);
+                const f = this.report.findings || {};
+                this.citations = f.citations || [];
+                if (f.format === 'structured' && f.structured_data &&
+                    Array.isArray(f.structured_data.columns) && Array.isArray(f.structured_data.rows)) {
+                    this.sd = f.structured_data;
+                    this.isStructured = true;
+                    this.allRows = [...this.sd.rows];
+                    this.filteredRows = [...this.allRows];
+                    const fc = this.sd.filter_columns || [];
+                    for (const col of fc) {
+                        if (this.sd.columns.some(c => c.key === col)) {
+                            this.filterCols.push(col);
+                            this.activeFilters[col] = '';
+                            this.filterOpts[col] = [...new Set(this.allRows.map(r => r[col]).filter(Boolean))].sort();
+                        }
+                    }
+                }
+            } catch (e) { showToast(e.message, 'error'); }
+            this.loading = false;
+        },
+
+        applyFilters() {
+            const q = this.searchQuery.toLowerCase().trim();
+            this.filteredRows = this.allRows.filter(row => {
+                if (q) { const hay = Object.values(row).map(v => Array.isArray(v) ? v.join(' ') : String(v || '')).join(' ').toLowerCase(); if (!hay.includes(q)) return false; }
+                for (const col of this.filterCols) { const fv = this.activeFilters[col]; if (fv && row[col] !== fv) return false; }
+                return true;
+            });
+            if (this.sortCol) this._doSort();
+        },
+        resetFilters() { this.searchQuery = ''; for (const col of this.filterCols) this.activeFilters[col] = ''; this.sortCol = null; this.sortDir = 1; this.filteredRows = [...this.allRows]; },
+        sortBy(col) { if (this.sortCol === col) this.sortDir *= -1; else { this.sortCol = col; this.sortDir = 1; } this._doSort(); },
+        _doSort() { const col = this.sortCol, dir = this.sortDir; this.filteredRows.sort((a, b) => { let va = a[col], vb = b[col]; if (Array.isArray(va)) va = va.join(','); if (Array.isArray(vb)) vb = vb.join(','); va = String(va || '').toLowerCase(); vb = String(vb || '').toLowerCase(); return va < vb ? -dir : va > vb ? dir : 0; }); },
+        getColLabel(key) { const c = this.sd && this.sd.columns.find(c => c.key === key); return c ? c.label : key; },
+        statHex(color) { return ({ green:'#34d399', red:'#f87171', blue:'#818cf8', default:'#22d3ee' })[color] || '#22d3ee'; },
+        badgeClass(value) { if (!value) return 'r-badge-default'; const p = ['r-badge-blue','r-badge-green','r-badge-purple','r-badge-amber','r-badge-rose','r-badge-cyan']; let h = 0; for (let i = 0; i < value.length; i++) h = value.charCodeAt(i) + ((h << 5) - h); return p[Math.abs(h) % p.length]; },
+        formatTime(iso) { if (!iso) return ''; const d = new Date(iso); return d.toLocaleDateString('en-US', {month:'2-digit',day:'2-digit',year:'numeric'}) + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); },
+        formatMarkdown(text) { return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\[(.*?)\]\((https?:\/\/.*?)\)/g, '<a href="$2" target="_blank" style="color:var(--deep-teal);text-decoration:underline;">$1</a>').replace(/^- /gm, '&bull; ').replace(/\n/g, '<br>'); }
+    }
+}
+</script>
+{% endblock %}

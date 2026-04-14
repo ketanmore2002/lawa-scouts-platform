@@ -1,0 +1,151 @@
+{% extends base_template|default("base.html") %}
+{% block title %}Shared Report — LAWA Scouts{% endblock %}
+
+{% block content %}
+<div x-data="sharedReport('{{ share_token }}')" x-init="init()" class="page-wrapper">
+
+    <!-- Loading -->
+    <template x-if="loading">
+        <div style="text-align:center;padding:64px 0;">
+            <div class="spinner"></div>
+            <p class="text-muted mt-12" style="font-size:14px;">Loading report...</p>
+        </div>
+    </template>
+
+    <!-- Not Found -->
+    <template x-if="!loading && !report">
+        <div class="card empty-state">
+            <div class="empty-icon">
+                <svg width="28" height="28" fill="none" stroke="var(--text-muted)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101"/></svg>
+            </div>
+            <h3 class="text-primary mb-8" style="font-size:18px;font-weight:600;">Report not found</h3>
+            <p class="text-secondary mb-24" style="font-size:14px;">This shared link may have expired or been revoked.</p>
+            <a href="/login" class="btn-primary">Sign in to LAWA Scouts</a>
+        </div>
+    </template>
+
+    <template x-if="!loading && report">
+        <div>
+            <!-- Shared badge -->
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+                <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);font-size:12px;font-weight:600;color:var(--mint);letter-spacing:.3px;">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                    SHARED REPORT
+                </div>
+            </div>
+
+            <!-- Header -->
+            <div class="mb-32">
+                <p class="eyebrow" x-text="'LAWA Scouts \u00b7 ' + report.scout_topic"></p>
+                <h1 class="page-title" x-text="report.title"></h1>
+                <p class="text-secondary mt-8" style="font-size:14px;opacity:.75;">
+                    <span x-text="formatTime(report.created_at)"></span>
+                    <span style="margin:0 8px;opacity:.4;">|</span>
+                    <span x-text="'Scout: ' + report.scout_name"></span>
+                </p>
+            </div>
+
+            <!-- Summary -->
+            <div class="card card-body mb-24">
+                <p class="section-label">Summary</p>
+                <p class="text-secondary" style="line-height:1.7;font-size:15px;" x-text="report.summary"></p>
+            </div>
+
+            <!-- Analysis & Key Findings -->
+            <template x-if="analysis">
+                <div class="card card-body mb-24">
+                    <div class="flex items-center gap-10 mb-16">
+                        <div class="analysis-icon">
+                            <svg width="16" height="16" fill="none" stroke="var(--deep-teal)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                        </div>
+                        <p style="font-size:14px;font-weight:700;color:var(--deep-teal);">Analysis & Key Findings</p>
+                    </div>
+                    <div class="text-secondary" style="font-size:14px;line-height:1.8;" x-html="formatAnalysis(analysis)"></div>
+                </div>
+            </template>
+
+            <!-- Key Insights -->
+            <template x-if="isStructured && sd.insights && sd.insights.length > 0">
+                <div class="card card-body mb-24">
+                    <p class="section-label">Key Insights</p>
+                    <div class="flex flex-col gap-12">
+                        <template x-for="(insight, ii) in sd.insights" :key="ii">
+                            <div class="flex items-start gap-12 text-secondary" style="font-size:14px;line-height:1.65;">
+                                <span class="insight-number" x-text="ii + 1"></span>
+                                <span x-text="insight"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Sources & Citations -->
+            <template x-if="citations.length > 0">
+                <div class="card card-body mb-24">
+                    <p class="section-label">
+                        Sources & Citations
+                        <span style="font-weight:400;text-transform:none;letter-spacing:0;" x-text="'(' + citations.length + ' sources)'"></span>
+                    </p>
+                    <div class="flex flex-col gap-8">
+                        <template x-for="(cite, ci) in citations" :key="ci">
+                            <a :href="cite.url" target="_blank" rel="noopener" class="source-link">
+                                <div class="source-number" x-text="ci + 1"></div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-primary text-truncate" style="font-size:13px;font-weight:500;" x-text="cite.title || cite.url"></p>
+                                    <p class="text-muted text-truncate" style="font-size:11px;" x-text="cite.url"></p>
+                                </div>
+                                <svg width="14" height="14" fill="none" stroke="var(--text-muted)" viewBox="0 0 24 24" class="shrink-0"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                            </a>
+                        </template>
+                    </div>
+                </div>
+            </template>
+
+            <!-- CTA -->
+            <div class="card card-body" style="text-align:center;padding:32px;">
+                <p class="text-secondary mb-16" style="font-size:14px;">This report was generated by <strong style="color:var(--mint);">LAWA Scouts</strong> — AI agents that monitor the web for you.</p>
+                <a href="https://lawa.app" target="_blank" class="btn-primary" style="display:inline-flex;">Try LAWA Scouts</a>
+            </div>
+        </div>
+    </template>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function sharedReport(shareToken) {
+    return {
+        shareToken, report: null, loading: true,
+        sd: null, isStructured: false,
+        analysis: '',
+        citations: [],
+
+        async init() {
+            try {
+                const resp = await fetch(`/api/shared/${this.shareToken}`);
+                if (!resp.ok) throw new Error('Not found');
+                this.report = await resp.json();
+                const f = this.report.findings || {};
+                this.citations = f.citations || [];
+                if (f.format === 'structured' && f.structured_data &&
+                    Array.isArray(f.structured_data.columns) && Array.isArray(f.structured_data.rows)) {
+                    this.sd = f.structured_data;
+                    this.isStructured = true;
+                    this.analysis = this.sd.analysis || '';
+                }
+            } catch (e) { this.report = null; }
+            this.loading = false;
+        },
+
+        formatAnalysis(text) {
+            if (!text) return '';
+            return text.split(/\n\n+/).filter(p => p.trim()).map(p => {
+                let escaped = p.trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text-primary);">$1</strong>').replace(/\n/g, '<br>');
+                return '<p style="margin-bottom:14px;">' + escaped + '</p>';
+            }).join('');
+        },
+        formatTime(iso) { if (!iso) return ''; const d = new Date(iso); return d.toLocaleDateString('en-US', {month:'2-digit',day:'2-digit',year:'numeric'}) + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); },
+    }
+}
+</script>
+{% endblock %}

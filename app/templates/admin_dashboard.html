@@ -1,0 +1,472 @@
+{% extends base_template|default("base.html") %}
+{% block title %}Admin Dashboard — LAWA Scouts{% endblock %}
+
+{% block content %}
+<div x-data="adminDashboard()" x-init="init()" class="page-wrapper">
+
+    <!-- Header -->
+    <div>
+        <p class="eyebrow">Administration</p>
+        <h1 class="page-title">Admin Dashboard</h1>
+        <p class="subtitle">Platform overview and management tools.</p>
+    </div>
+
+    <!-- Loading -->
+    <template x-if="loading">
+        <div style="text-align:center;padding:48px 0;">
+            <div class="spinner"></div>
+            <p class="text-muted mt-12" style="font-size:14px;">Loading admin data...</p>
+        </div>
+    </template>
+
+    <template x-if="!loading">
+    <div>
+
+        <!-- ═══ STAT CARDS ═══ -->
+        <div class="admin-stats-grid mb-28">
+            <div class="admin-stat-card admin-stat-card-teal">
+                <div class="admin-stat-icon" style="background:rgba(16,185,129,.12);">
+                    <svg width="20" height="20" fill="none" stroke="var(--mint)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </div>
+                <div class="stat-value text-teal" x-text="stats.total_users">0</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+            <div class="admin-stat-card admin-stat-card-cyan" style="animation-delay:.05s;">
+                <div class="admin-stat-icon" style="background:rgba(34,211,238,.12);">
+                    <svg width="20" height="20" fill="none" stroke="var(--cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                </div>
+                <div class="stat-value text-cyan" x-text="stats.total_scouts">0</div>
+                <div class="stat-label">Total Scouts</div>
+            </div>
+            <div class="admin-stat-card admin-stat-card-purple" style="animation-delay:.1s;">
+                <div class="admin-stat-icon" style="background:rgba(168,85,247,.12);">
+                    <svg width="20" height="20" fill="none" stroke="var(--purple)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </div>
+                <div class="stat-value text-purple" x-text="stats.total_reports">0</div>
+                <div class="stat-label">Total Reports</div>
+            </div>
+            <div class="admin-stat-card admin-stat-card-indigo" style="animation-delay:.15s;">
+                <div class="admin-stat-icon" style="background:rgba(99,102,241,.12);">
+                    <svg width="20" height="20" fill="none" stroke="var(--indigo)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </div>
+                <div class="stat-value" style="color:var(--indigo);" x-text="stats.active_scouts">0</div>
+                <div class="stat-label">Active Scouts</div>
+            </div>
+        </div>
+
+        <!-- ═══ TAB BAR ═══ -->
+        <div class="tab-bar mb-24">
+            <div class="tab-bar-left">
+                <button class="tab-btn" :class="{ 'tab-btn-active': activeTab === 'overview' }" @click="activeTab = 'overview'; $nextTick(() => initCharts())">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                    Overview
+                </button>
+                <button class="tab-btn" :class="{ 'tab-btn-active': activeTab === 'users' }" @click="activeTab = 'users'">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                    Users
+                    <span class="tab-count" x-text="users.length"></span>
+                </button>
+                <button class="tab-btn" :class="{ 'tab-btn-active': activeTab === 'scouts' }" @click="activeTab = 'scouts'">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    All Scouts
+                    <span class="tab-count" x-text="allScouts.length"></span>
+                </button>
+                <button class="tab-btn" :class="{ 'tab-btn-active': activeTab === 'activity' }" @click="activeTab = 'activity'">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Activity
+                </button>
+            </div>
+        </div>
+
+        <!-- ═══ TAB: OVERVIEW ═══ -->
+        <div x-show="activeTab === 'overview'" x-cloak>
+            <div class="admin-charts-grid mb-24">
+                <!-- User Growth -->
+                <div class="admin-chart-card">
+                    <p class="section-label mb-16">User Growth (30 days)</p>
+                    <div style="position:relative;height:200px;width:100%;">
+                        <canvas x-ref="userGrowthChart"></canvas>
+                    </div>
+                </div>
+                <!-- Scout Creation -->
+                <div class="admin-chart-card" style="animation-delay:.05s;">
+                    <p class="section-label mb-16">Scout Creation Trend</p>
+                    <div style="position:relative;height:200px;width:100%;">
+                        <canvas x-ref="scoutCreationChart"></canvas>
+                    </div>
+                </div>
+                <!-- Reports Per Day (full width) -->
+                <div class="admin-chart-card" style="grid-column:1/-1;animation-delay:.1s;">
+                    <p class="section-label mb-16">Reports Generated Per Day</p>
+                    <div style="position:relative;height:180px;width:100%;">
+                        <canvas x-ref="reportsPerDayChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- World Map -->
+            <div class="admin-map-wrap" style="animation-delay:.15s;">
+                <p class="section-label mb-16">Traffic Origins</p>
+                <div x-ref="worldMap" style="min-height:200px;display:flex;align-items:center;justify-content:center;">
+                    <template x-if="mapLoading">
+                        <p class="text-muted" style="font-size:13px;">Loading map...</p>
+                    </template>
+                </div>
+                <div class="admin-map-legend">
+                    <div class="admin-map-legend-item">
+                        <div class="admin-map-legend-dot" style="background:rgba(16,185,129,.35);"></div>
+                        <span>Active regions</span>
+                    </div>
+                    <div class="admin-map-legend-item">
+                        <div class="admin-map-legend-dot" style="background:var(--surface);border:1px solid var(--border);"></div>
+                        <span>No traffic</span>
+                    </div>
+                    <div class="ml-auto">
+                        <span class="text-muted" style="font-size:11px;font-family:'IBM Plex Mono',monospace;" x-text="geoCountries.length + ' countries detected'"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ TAB: USERS ═══ -->
+        <div x-show="activeTab === 'users'" x-cloak>
+            <div class="admin-table-wrap">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Name</th>
+                            <th>Scouts</th>
+                            <th>Reports</th>
+                            <th>Last Login</th>
+                            <th>Joined</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="u in users" :key="u.id">
+                            <tr>
+                                <td>
+                                    <div class="flex items-center gap-8">
+                                        <div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0;" x-text="u.email[0].toUpperCase()"></div>
+                                        <div>
+                                            <span class="text-primary" style="font-weight:500;" x-text="u.email"></span>
+                                            <template x-if="u.is_admin">
+                                                <span style="margin-left:6px;display:inline-block;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.5px;background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.2);">Admin</span>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td x-text="u.name || '\u2014'"></td>
+                                <td><span class="r-badge r-badge-cyan" x-text="u.scout_count"></span></td>
+                                <td><span class="r-badge r-badge-purple" x-text="u.report_count"></span></td>
+                                <td class="text-muted" style="font-size:12px;" x-text="u.last_login_at ? formatTime(u.last_login_at) : 'Never'"></td>
+                                <td class="text-muted" style="font-size:12px;" x-text="formatTime(u.created_at)"></td>
+                                <td>
+                                    <template x-if="!u.is_admin">
+                                        <button class="admin-delete-btn" @click="deleteUser(u)">Delete</button>
+                                    </template>
+                                    <template x-if="u.is_admin">
+                                        <span class="text-muted" style="font-size:11px;">&mdash;</span>
+                                    </template>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ═══ TAB: ALL SCOUTS ═══ -->
+        <div x-show="activeTab === 'scouts'" x-cloak>
+            <div class="admin-table-wrap">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Scout</th>
+                            <th>Owner</th>
+                            <th>Status</th>
+                            <th>Reports</th>
+                            <th>Last Run</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="s in allScouts" :key="s.id">
+                            <tr>
+                                <td style="max-width:320px;">
+                                    <div class="text-primary" style="font-weight:500;" x-text="s.name"></div>
+                                    <div class="text-muted" style="font-size:11px;white-space:normal;line-height:1.4;margin-top:2px;max-width:300px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;" x-text="s.topic"></div>
+                                </td>
+                                <td style="font-size:12px;" x-text="s.owner_email"></td>
+                                <td>
+                                    <span :class="s.status === 'active' ? 'status-active' : (s.status === 'once' ? 'status-active' : 'status-paused')" x-text="s.status === 'once' ? 'one-time' : s.status"></span>
+                                </td>
+                                <td><span class="r-badge r-badge-purple" x-text="s.report_count"></span></td>
+                                <td class="text-muted" style="font-size:12px;" x-text="s.last_run_at ? formatTime(s.last_run_at) : 'Never'"></td>
+                                <td class="text-muted" style="font-size:12px;" x-text="formatTime(s.created_at)"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ═══ TAB: ACTIVITY ═══ -->
+        <div x-show="activeTab === 'activity'" x-cloak>
+            <template x-if="recentReports.length === 0">
+                <div class="card empty-state">
+                    <div class="empty-icon">
+                        <svg width="28" height="28" fill="none" stroke="var(--deep-teal)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <h3 class="text-primary mb-8" style="font-size:18px;font-weight:600;">No activity yet</h3>
+                    <p class="text-secondary" style="font-size:14px;">Reports will appear here as users run their scouts.</p>
+                </div>
+            </template>
+            <template x-if="recentReports.length > 0">
+                <div class="admin-timeline">
+                    <template x-for="(r, ri) in recentReports" :key="r.id">
+                        <div class="admin-timeline-item" :style="{ animationDelay: (ri * 0.04) + 's' }">
+                            <div class="card card-body" style="margin-left:8px;">
+                                <div class="flex items-start justify-between gap-12 mb-6">
+                                    <div class="flex-1 min-w-0">
+                                        <h4 class="text-primary" style="font-weight:600;font-size:14px;" x-text="r.title"></h4>
+                                        <div class="flex items-center gap-8 mt-4">
+                                            <span class="r-badge r-badge-green" x-text="r.scout_name"></span>
+                                            <span class="text-muted" style="font-size:11px;" x-text="r.owner_email"></span>
+                                        </div>
+                                    </div>
+                                    <span class="text-muted shrink-0" style="font-size:11px;white-space:nowrap;" x-text="formatTime(r.created_at)"></span>
+                                </div>
+                                <p class="text-secondary line-clamp-2" style="font-size:13px;" x-text="r.summary"></p>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </div>
+
+    </div>
+    </template>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function adminDashboard() {
+    return {
+        loading: true,
+        activeTab: 'overview',
+        stats: { total_users: 0, total_scouts: 0, total_reports: 0, active_scouts: 0 },
+        users: [],
+        allScouts: [],
+        recentReports: [],
+        charts: {},
+        geoCountries: [],
+        mapLoading: true,
+        _chartInstances: [],
+
+        async init() {
+            try {
+                const [statsData, usersData, scoutsData, reportsData, chartsData, geoData] = await Promise.all([
+                    apiCall('/api/admin/stats'),
+                    apiCall('/api/admin/users'),
+                    apiCall('/api/admin/scouts'),
+                    apiCall('/api/admin/recent-reports'),
+                    apiCall('/api/admin/charts'),
+                    apiCall('/api/admin/geo'),
+                ]);
+                this.stats = statsData;
+                this.users = usersData;
+                this.allScouts = scoutsData;
+                this.recentReports = reportsData;
+                this.charts = chartsData;
+                this.geoCountries = geoData.countries || [];
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+            this.loading = false;
+            // Need extra delay for Alpine to render the x-if/x-show content
+            setTimeout(() => {
+                this.initCharts();
+                this.initMap();
+            }, 100);
+            // Re-render charts on theme change
+            window.addEventListener('theme-changed', () => {
+                setTimeout(() => this.initCharts(), 50);
+            });
+        },
+
+        initCharts() {
+            if (typeof Chart === 'undefined') return;
+
+            // Destroy existing chart instances
+            this._chartInstances.forEach(c => c.destroy());
+            this._chartInstances = [];
+
+            const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+            Chart.defaults.color = isLight ? '#5a5a72' : '#9898a8';
+            Chart.defaults.borderColor = isLight ? '#dfe1e6' : '#27272e';
+            Chart.defaults.font.family = "'Inter', sans-serif";
+            Chart.defaults.font.size = 11;
+
+            const gridColor = isLight ? 'rgba(0,0,0,.06)' : 'rgba(39,39,46,.6)';
+            const scaleOpts = {
+                grid: { color: gridColor, drawBorder: false },
+                ticks: { padding: 8 },
+            };
+
+            // User Growth
+            const ugCtx = this.$refs.userGrowthChart;
+            if (ugCtx) {
+                const labels = (this.charts.user_growth || []).map(p => p.date.slice(5));
+                const data = (this.charts.user_growth || []).map(p => p.count);
+                const c = new Chart(ugCtx, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: 'New Users',
+                            data,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16,185,129,.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true,
+                            pointBackgroundColor: '#10b981',
+                            pointRadius: 3,
+                            pointHoverRadius: 5,
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { x: scaleOpts, y: { ...scaleOpts, beginAtZero: true } },
+                    },
+                });
+                this._chartInstances.push(c);
+            }
+
+            // Scout Creation
+            const scCtx = this.$refs.scoutCreationChart;
+            if (scCtx) {
+                const labels = (this.charts.scout_creation || []).map(p => p.date.slice(5));
+                const data = (this.charts.scout_creation || []).map(p => p.count);
+                const c = new Chart(scCtx, {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: 'Scouts Created',
+                            data,
+                            backgroundColor: 'rgba(34,211,238,.25)',
+                            borderColor: '#22d3ee',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { x: scaleOpts, y: { ...scaleOpts, beginAtZero: true } },
+                    },
+                });
+                this._chartInstances.push(c);
+            }
+
+            // Reports Per Day
+            const rpCtx = this.$refs.reportsPerDayChart;
+            if (rpCtx) {
+                const labels = (this.charts.reports_per_day || []).map(p => p.date.slice(5));
+                const data = (this.charts.reports_per_day || []).map(p => p.count);
+                const c = new Chart(rpCtx, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: 'Reports',
+                            data,
+                            borderColor: '#a855f7',
+                            backgroundColor: 'rgba(168,85,247,.12)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true,
+                            pointBackgroundColor: '#a855f7',
+                            pointRadius: 2,
+                            pointHoverRadius: 5,
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { x: scaleOpts, y: { ...scaleOpts, beginAtZero: true } },
+                    },
+                });
+                this._chartInstances.push(c);
+            }
+        },
+
+        countryName(code) {
+            const names = {US:'United States',IN:'India',GB:'United Kingdom',DE:'Germany',AE:'UAE',CA:'Canada',AU:'Australia',FR:'France',JP:'Japan',BR:'Brazil',SG:'Singapore',NL:'Netherlands',KR:'South Korea',SA:'Saudi Arabia',ZA:'South Africa',PK:'Pakistan',NG:'Nigeria',KE:'Kenya',CN:'China',RU:'Russia',IT:'Italy',ES:'Spain',MX:'Mexico',TR:'Turkey',ID:'Indonesia',TH:'Thailand',SE:'Sweden',CH:'Switzerland',PL:'Poland',PH:'Philippines',EG:'Egypt',CO:'Colombia',MY:'Malaysia',AR:'Argentina',IL:'Israel',IE:'Ireland',NO:'Norway',DK:'Denmark',FI:'Finland',PT:'Portugal',CZ:'Czechia',RO:'Romania',NZ:'New Zealand',BD:'Bangladesh',VN:'Vietnam',QA:'Qatar',KW:'Kuwait',BH:'Bahrain',OM:'Oman',HK:'Hong Kong'};
+            return names[code] || code;
+        },
+
+        initMap() {
+            const mapContainer = this.$refs.worldMap;
+            if (!mapContainer) return;
+            this.mapLoading = false;
+
+            if (!this.geoCountries.length) {
+                mapContainer.innerHTML = '<p class="text-muted" style="text-align:center;padding:40px;font-size:13px;">No traffic data yet.</p>';
+                return;
+            }
+
+            const maxCount = Math.max(...this.geoCountries.map(c => c.count));
+            const colors = ['#10b981','#22d3ee','#a855f7','#818cf8','#f59e0b','#f87171'];
+            let html = '<div style="width:100%;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;padding:8px 0;">';
+            this.geoCountries.forEach((c, i) => {
+                const pct = Math.max(8, (c.count / maxCount) * 100);
+                const color = colors[i % colors.length];
+                const name = this.countryName(c.country_code);
+                html += `
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;">
+                    <span style="font-size:12px;font-weight:700;color:var(--text-muted);min-width:24px;font-family:'IBM Plex Mono',monospace;">${c.country_code}</span>
+                    <div style="flex:1;min-width:0;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                            <span style="font-size:12px;color:var(--text-primary);font-weight:500;">${name}</span>
+                            <span style="font-size:11px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">${c.count}</span>
+                        </div>
+                        <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;">
+                            <div style="height:100%;width:${pct}%;background:${color};border-radius:2px;transition:width .5s ease;"></div>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            html += '</div>';
+            mapContainer.innerHTML = html;
+        },
+
+        async deleteUser(u) {
+            if (!confirm(`Delete user ${u.email}?\n\nThis will permanently delete all their scouts and reports.`)) return;
+            try {
+                await apiCall(`/api/admin/users/${u.id}`, 'DELETE');
+                this.users = this.users.filter(x => x.id !== u.id);
+                showToast('User deleted');
+                this.stats = await apiCall('/api/admin/stats');
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        },
+
+        formatTime(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            return d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        },
+    }
+}
+</script>
+{% endblock %}

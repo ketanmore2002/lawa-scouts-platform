@@ -1,0 +1,200 @@
+{% extends base_template|default("base.html") %}
+{% block title %}Scout Templates — LAWA Scouts{% endblock %}
+
+{% block content %}
+<div x-data="templatesPage()" class="page-wrapper">
+
+    <!-- Header -->
+    <div>
+        <a href="/" class="back-link">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            Back to Dashboard
+        </a>
+        <h1 class="page-title mb-8">Scout Templates</h1>
+        <p class="subtitle">Start with a pre-built template and customize it to your needs.</p>
+    </div>
+
+    <!-- Category Filter -->
+    <div class="flex flex-wrap gap-8">
+        <button @click="filter = 'all'" class="artifact-filter-pill" :class="filter === 'all' ? 'artifact-filter-active' : ''">
+            All
+        </button>
+        <template x-for="cat in categories" :key="cat.key">
+            <button @click="filter = cat.key" class="artifact-filter-pill" :class="filter === cat.key ? 'artifact-filter-active' : ''" x-text="cat.label"></button>
+        </template>
+    </div>
+
+    <!-- Templates Grid -->
+    <div class="scouts-grid">
+        <template x-for="(tmpl, idx) in filteredTemplates" :key="idx">
+            <div class="card card-body card-interactive" :style="'animation-delay:' + (idx * 0.03) + 's'" @click="useTemplate(tmpl)">
+                <div class="flex items-start gap-14 mb-14">
+                    <div style="width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"
+                         :style="'background:' + tmpl.color + '15;border:1px solid ' + tmpl.color + '30'">
+                        <span style="font-size:20px;" x-text="tmpl.icon"></span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-primary" style="font-size:15px;font-weight:600;margin-bottom:2px;" x-text="tmpl.name"></h3>
+                        <span class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;" x-text="tmpl.category"></span>
+                    </div>
+                </div>
+                <p class="text-secondary line-clamp-2 mb-14" style="font-size:13px;line-height:1.6;" x-text="tmpl.description"></p>
+                <div class="flex items-center justify-between">
+                    <span class="text-muted" style="font-size:11px;" x-text="tmpl.frequency"></span>
+                    <span style="font-size:12px;color:var(--mint);font-weight:500;">Use template &rarr;</span>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- Custom Scout CTA -->
+    <div class="card card-body" style="text-align:center;padding:40px;">
+        <p class="text-secondary mb-16" style="font-size:15px;">Don't see what you need?</p>
+        <a href="/scouts/new" class="btn-primary" style="display:inline-flex;">Create Custom Scout</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function templatesPage() {
+    return {
+        filter: 'all',
+
+        categories: [
+            { key: 'market', label: 'Market Research' },
+            { key: 'competitor', label: 'Competitor Intel' },
+            { key: 'tech', label: 'Tech & AI' },
+            { key: 'finance', label: 'Finance' },
+            { key: 'ecommerce', label: 'E-Commerce' },
+            { key: 'news', label: 'News & Trends' },
+        ],
+
+        templates: [
+            {
+                name: 'Competitor Price Tracker',
+                category: 'competitor',
+                description: 'Monitor competitor product pricing across major e-commerce platforms. Get alerts when prices change.',
+                query: 'Track pricing of [PRODUCT] across Amazon, Flipkart, and other e-commerce sites. Compare prices, ratings, and availability.',
+                frequency: 'Daily recommended',
+                icon: '💰',
+                color: '#10b981',
+            },
+            {
+                name: 'Industry News Digest',
+                category: 'news',
+                description: 'Daily digest of the latest news, press releases, and announcements in your industry.',
+                query: 'Latest news and announcements in the [INDUSTRY] industry from the past 24 hours. Include source, date, and key takeaways.',
+                frequency: 'Daily recommended',
+                icon: '📰',
+                color: '#6366f1',
+            },
+            {
+                name: 'AI & ML Research Monitor',
+                category: 'tech',
+                description: 'Track the latest AI research papers, model releases, and breakthroughs from top labs.',
+                query: 'Latest AI and machine learning research papers, model releases, and breakthroughs from OpenAI, Google DeepMind, Anthropic, and Meta AI this week.',
+                frequency: 'Weekly recommended',
+                icon: '🤖',
+                color: '#a855f7',
+            },
+            {
+                name: 'Stock Market Summary',
+                category: 'finance',
+                description: 'Daily market overview with top gainers, losers, and key indices performance.',
+                query: 'Today\'s stock market summary: Nifty 50 and Sensex performance, top 10 gainers and losers, sector-wise performance, and FII/DII activity.',
+                frequency: 'Daily recommended',
+                icon: '📈',
+                color: '#22d3ee',
+            },
+            {
+                name: 'Product Review Aggregator',
+                category: 'ecommerce',
+                description: 'Aggregate reviews from multiple sources for any product to make informed purchase decisions.',
+                query: 'Find the best [PRODUCT] under [BUDGET]. Compare specifications, prices, user ratings, and expert reviews across Amazon, Flipkart, and tech review sites.',
+                frequency: 'One-time',
+                icon: '⭐',
+                color: '#f59e0b',
+            },
+            {
+                name: 'Job Market Trends',
+                category: 'market',
+                description: 'Track job postings, salary trends, and in-demand skills for a specific role or industry.',
+                query: 'Job market trends for [ROLE] in [LOCATION]: number of openings, salary ranges, top hiring companies, and most in-demand skills.',
+                frequency: 'Weekly recommended',
+                icon: '💼',
+                color: '#ef4444',
+            },
+            {
+                name: 'SaaS Competitor Analysis',
+                category: 'competitor',
+                description: 'Deep dive into competitor SaaS products — features, pricing, reviews, and market positioning.',
+                query: 'Compare [PRODUCT] with its top 5 competitors. Include pricing tiers, key features, G2/Capterra ratings, and recent product updates.',
+                frequency: 'Weekly recommended',
+                icon: '����',
+                color: '#10b981',
+            },
+            {
+                name: 'Tech Stack Trends',
+                category: 'tech',
+                description: 'Monitor trending technologies, frameworks, and tools in the developer ecosystem.',
+                query: 'Trending programming languages, frameworks, and developer tools this month. Include GitHub stars, npm downloads, and community sentiment.',
+                frequency: 'Weekly recommended',
+                icon: '⚡',
+                color: '#a855f7',
+            },
+            {
+                name: 'Crypto Market Watch',
+                category: 'finance',
+                description: 'Track cryptocurrency prices, market cap changes, and major news affecting the crypto market.',
+                query: 'Cryptocurrency market overview: top 20 coins by market cap, 24h price changes, trading volume, and major crypto news today.',
+                frequency: 'Daily recommended',
+                icon: '🪙',
+                color: '#f59e0b',
+            },
+            {
+                name: 'Amazon Best Sellers',
+                category: 'ecommerce',
+                description: 'Track best-selling products in any Amazon category with prices and trends.',
+                query: 'Top 20 best-selling products in [CATEGORY] on Amazon India. Include price, ratings, review count, and whether they are on sale.',
+                frequency: 'Weekly recommended',
+                icon: '🛒',
+                color: '#22d3ee',
+            },
+            {
+                name: 'Startup Funding Tracker',
+                category: 'finance',
+                description: 'Monitor recent startup funding rounds, acquisitions, and IPO filings in your sector.',
+                query: 'Recent startup funding rounds in [SECTOR] from the past week. Include company name, round type, amount raised, investors, and valuation.',
+                frequency: 'Weekly recommended',
+                icon: '🚀',
+                color: '#6366f1',
+            },
+            {
+                name: 'Regulatory Updates',
+                category: 'news',
+                description: 'Stay updated on regulatory changes, policy announcements, and compliance requirements.',
+                query: 'Latest regulatory updates and policy changes affecting [INDUSTRY] in [COUNTRY]. Include effective dates, key requirements, and impact assessment.',
+                frequency: 'Weekly recommended',
+                icon: '⚖️',
+                color: '#ef4444',
+            },
+        ],
+
+        get filteredTemplates() {
+            if (this.filter === 'all') return this.templates;
+            return this.templates.filter(t => t.category === this.filter);
+        },
+
+        useTemplate(tmpl) {
+            // Store template in sessionStorage and redirect to create page
+            sessionStorage.setItem('scout_template', JSON.stringify({
+                query: tmpl.query,
+                name: tmpl.name,
+            }));
+            navigateTo('/scouts/new');
+        }
+    }
+}
+</script>
+{% endblock %}

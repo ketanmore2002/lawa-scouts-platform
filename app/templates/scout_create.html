@@ -1,0 +1,321 @@
+{% extends base_template|default("base.html") %}
+{% block title %}Create Scout{% endblock %}
+
+{% block content %}
+<div x-data="createWizard()" x-init="init()" style="display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 200px);">
+
+    <div class="wizard-card">
+        <!-- ═══ STEP 1: Query ═══ -->
+        <div x-show="step === 1" x-cloak>
+            <div class="wizard-body">
+                <div class="flex items-center justify-between mb-24">
+                    <h2 class="wizard-title">What do you want to scout?</h2>
+                    <a href="/" class="wizard-close">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </a>
+                </div>
+                <textarea x-model="query" rows="5" class="input" style="font-size:16px;"
+                          placeholder="e.g., Track MRF stock on NSE and show me plots and graphs, generate a PDF report"></textarea>
+                <p class="text-muted mt-8" style="font-size:13px;">
+                    Supported formats: <span class="text-secondary" style="font-weight:500;">PDF, Excel, HTML, PowerPoint, CSV, TXT</span>
+                    &middot; <a href="/scouts/templates" style="color:var(--mint);text-decoration:none;font-weight:500;">Browse templates</a>
+                </p>
+
+                <!-- Workspace Selector -->
+                <template x-if="workspaces.length > 0">
+                    <div style="margin-top:16px;">
+                        <label class="text-muted" style="font-size:12px;font-weight:500;display:block;margin-bottom:6px;">Assign to workspace</label>
+                        <select x-model="selectedWorkspace" class="input" style="font-size:14px;height:42px;">
+                            <option value="">Personal (just me)</option>
+                            <template x-for="ws in workspaces" :key="ws.id">
+                                <option :value="ws.id" x-text="ws.name"></option>
+                            </template>
+                        </select>
+                    </div>
+                </template>
+
+                <!-- Source Filters (collapsible) -->
+                <div style="margin-top:16px;">
+                    <button type="button" @click="showSources = !showSources"
+                            style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--text-muted);font-size:13px;cursor:pointer;padding:4px 0;">
+                        <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                             :style="showSources ? 'transform:rotate(90deg)' : ''" style="transition:transform .15s;">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                        Source filters (optional)
+                    </button>
+                    <div x-show="showSources" x-cloak style="margin-top:10px;display:flex;flex-direction:column;gap:12px;">
+                        <div>
+                            <label class="text-muted" style="font-size:12px;font-weight:500;display:block;margin-bottom:4px;">Focus on these URLs/domains</label>
+                            <textarea x-model="includeSources" rows="2" class="input" style="font-size:13px;"
+                                      placeholder="e.g. amazon.in&#10;flipkart.com"></textarea>
+                        </div>
+                        <div>
+                            <label class="text-muted" style="font-size:12px;font-weight:500;display:block;margin-bottom:4px;">Exclude these domains</label>
+                            <textarea x-model="excludeSources" rows="2" class="input" style="font-size:13px;"
+                                      placeholder="e.g. pinterest.com&#10;quora.com"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="wizard-footer">
+                <a href="/" class="wizard-back">Cancel</a>
+                <div class="wizard-dots">
+                    <div class="wizard-dot wizard-dot-active"></div>
+                    <div class="wizard-dot"></div>
+                    <div class="wizard-dot"></div>
+                </div>
+                <button @click="step = 2" :disabled="!query.trim()" class="wizard-next">
+                    Next
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- ═══ STEP 2: Frequency ═══ -->
+        <div x-show="step === 2" x-cloak>
+            <div class="wizard-body">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="wizard-title">How often should we scout for this?</h2>
+                    <a href="/" class="wizard-close">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </a>
+                </div>
+
+                <div class="option-list">
+                    <!-- Just once -->
+                    <div class="option-item" :class="frequency === 'once' ? 'option-item-active' : ''" @click="frequency = 'once'">
+                        <div class="option-icon">
+                            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        </div>
+                        <div class="flex-1">
+                            <div class="option-label">Just once</div>
+                            <div class="option-sublabel">Run a single search and deliver the results</div>
+                        </div>
+                        <div class="option-key">1</div>
+                    </div>
+
+                    <!-- Daily -->
+                    <div class="option-item" :class="frequency === 'daily' ? 'option-item-active' : ''" @click="frequency = 'daily'">
+                        <div class="option-icon">
+                            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <div class="flex-1">
+                            <div class="option-label">Daily</div>
+                            <div class="option-sublabel">Scout every day at a time you choose</div>
+                        </div>
+                        <div class="option-key">2</div>
+                    </div>
+
+                    <!-- Weekly -->
+                    <div class="option-item" :class="frequency === 'weekly' ? 'option-item-active' : ''" @click="frequency = 'weekly'">
+                        <div class="option-icon">
+                            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        </div>
+                        <div class="flex-1">
+                            <div class="option-label">Weekly</div>
+                            <div class="option-sublabel">Scout on specific days of the week</div>
+                        </div>
+                        <div class="option-key">3</div>
+                    </div>
+                </div>
+
+                <!-- Email report checkbox -->
+                <div style="margin-top:20px;padding:14px 18px;border-radius:12px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .15s;"
+                     :style="{ background: emailReport ? 'rgba(16,185,129,.1)' : 'var(--surface)', border: emailReport ? '1px solid rgba(16,185,129,.3)' : '1px solid var(--border)' }"
+                     @click="emailReport = !emailReport">
+                    <div style="width:20px;height:20px;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s;"
+                         :style="{ background: emailReport ? 'var(--mint)' : 'transparent', border: emailReport ? '2px solid var(--mint)' : '2px solid var(--border-light)' }">
+                        <svg style="transition:opacity .15s;" :style="{ opacity: emailReport ? 1 : 0 }" width="12" height="12" fill="none" stroke="#fff" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3.5" d="M5 13l4 4L19 7"/></svg>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:14px;font-weight:500;color:var(--text-primary);">Email me the report</div>
+                        <div class="text-muted" style="font-size:12px;margin-top:2px;">Receive a copy of each report in your inbox</div>
+                    </div>
+                </div>
+            </div>
+            <div class="wizard-footer">
+                <button @click="step = 1" class="wizard-back">Back</button>
+                <div class="wizard-dots">
+                    <div class="wizard-dot wizard-dot-done"></div>
+                    <div class="wizard-dot wizard-dot-active"></div>
+                    <div class="wizard-dot"></div>
+                </div>
+                <template x-if="frequency === 'once'">
+                    <button @click="submit()" :disabled="!frequency || submitting" class="wizard-next">
+                        <template x-if="submitting"><div class="spinner-sm"></div></template>
+                        <svg x-show="!submitting" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <span x-text="submitting ? 'Creating...' : 'Scout'"></span>
+                    </button>
+                </template>
+                <template x-if="frequency === 'daily' || frequency === 'weekly'">
+                    <button @click="step = 3" :disabled="!frequency" class="wizard-next">
+                        Next
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                </template>
+            </div>
+        </div>
+
+        <!-- ═══ STEP 3: Time selection ═══ -->
+        <div x-show="step === 3" x-cloak>
+            <div class="wizard-body">
+                <div class="flex items-center justify-between mb-24">
+                    <h2 class="wizard-title" x-text="frequency === 'weekly' ? 'Which days and time?' : 'What time of day?'"></h2>
+                    <a href="/" class="wizard-close">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </a>
+                </div>
+
+                <!-- Day of week pills (weekly only) -->
+                <template x-if="frequency === 'weekly'">
+                    <div class="day-pills mb-24">
+                        <template x-for="day in days" :key="day.key">
+                            <button class="day-pill" :class="selectedDay === day.key ? 'day-pill-active' : ''" @click="selectedDay = day.key" x-text="day.label"></button>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- Time of day layout -->
+                <div class="flex gap-24 wizard-time-layout" style="min-height:180px;">
+                    <!-- Time presets -->
+                    <div class="time-pills" style="flex:1;">
+                        <template x-for="t in times" :key="t.key">
+                            <button class="time-pill" :class="selectedTime === t.key ? 'time-pill-active' : ''" @click="selectedTime = t.key" x-text="t.label"></button>
+                        </template>
+                    </div>
+
+                    <!-- Clock display -->
+                    <div class="time-display" style="flex:1;">
+                        <div class="time-clock">
+                            <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <div class="time-value" x-text="getTimeDisplay()"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="wizard-footer">
+                <button @click="step = 2" class="wizard-back">Back</button>
+                <div class="wizard-dots">
+                    <div class="wizard-dot wizard-dot-done"></div>
+                    <div class="wizard-dot wizard-dot-done"></div>
+                    <div class="wizard-dot wizard-dot-active"></div>
+                </div>
+                <button @click="submit()" :disabled="submitting" class="wizard-next">
+                    <template x-if="submitting"><div class="spinner-sm"></div></template>
+                    <svg x-show="!submitting" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <span x-text="submitting ? 'Creating...' : 'Scout'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function createWizard() {
+    // Load template from sessionStorage if available
+    let initialQuery = '';
+    try {
+        const tmpl = sessionStorage.getItem('scout_template');
+        if (tmpl) {
+            const parsed = JSON.parse(tmpl);
+            initialQuery = parsed.query || '';
+            sessionStorage.removeItem('scout_template');
+        }
+    } catch (e) {}
+
+    return {
+        step: 1,
+        query: initialQuery,
+        frequency: null,
+        emailReport: false,
+        selectedDay: 'mo',
+        selectedTime: 'morning',
+        submitting: false,
+        showSources: false,
+        includeSources: '',
+        excludeSources: '',
+        workspaces: [],
+        selectedWorkspace: '',
+
+        async init() {
+            try {
+                this.workspaces = await apiCall('/api/workspaces');
+            } catch (e) {}
+        },
+
+        days: [
+            { key: 'mo', label: 'Mo' },
+            { key: 'tu', label: 'Tu' },
+            { key: 'we', label: 'We' },
+            { key: 'th', label: 'Th' },
+            { key: 'fr', label: 'Fr' },
+            { key: 'sa', label: 'Sa' },
+            { key: 'su', label: 'Su' },
+        ],
+
+        times: [
+            { key: 'morning',   label: 'Morning',   time: '09:00 AM' },
+            { key: 'noon',      label: 'Noon',       time: '12:00 PM' },
+            { key: 'afternoon', label: 'Afternoon',  time: '03:00 PM' },
+            { key: 'evening',   label: 'Evening',    time: '06:00 PM' },
+        ],
+
+        getTimeDisplay() {
+            const t = this.times.find(t => t.key === this.selectedTime);
+            return t ? t.time : '09:00 AM';
+        },
+
+        getScheduleMinutes() {
+            switch (this.frequency) {
+                case 'once':     return 0;
+                case 'daily':    return 1440;
+                case 'weekly':   return 10080;
+                default:         return 1440;
+            }
+        },
+
+        getScheduleDescription() {
+            switch (this.frequency) {
+                case 'once':     return 'Run once';
+                case 'daily':    return `Daily at ${this.getTimeDisplay()}`;
+                case 'weekly': {
+                    const day = this.days.find(d => d.key === this.selectedDay);
+                    return `Weekly on ${day ? day.label : 'Mo'} at ${this.getTimeDisplay()}`;
+                }
+                default:         return '';
+            }
+        },
+
+        async submit() {
+            this.submitting = true;
+            try {
+                const scheduleMinutes = this.getScheduleMinutes();
+                const description = this.getScheduleDescription();
+                const body = {
+                    topic: this.query.trim(),
+                    description: description,
+                    schedule_minutes: scheduleMinutes,
+                    email_report: this.emailReport,
+                };
+                if (this.includeSources.trim()) body.include_sources = this.includeSources.trim();
+                if (this.excludeSources.trim()) body.exclude_sources = this.excludeSources.trim();
+                if (this.selectedWorkspace) body.workspace_id = this.selectedWorkspace;
+                const scout = await apiCall('/api/scouts', 'POST', body);
+                showToast('Scout created — running now...');
+
+                if (this.frequency === 'once') {
+                    // One-time scout: go to detail page which auto-runs it
+                    navigateTo('/scouts/' + scout.id + '?autorun=1');
+                } else {
+                    setTimeout(() => navigateTo('/'), 500);
+                }
+            } catch (e) { showToast(e.message, 'error'); }
+            this.submitting = false;
+        }
+    }
+}
+</script>
+{% endblock %}

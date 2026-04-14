@@ -1,0 +1,26 @@
+# Environment & secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+
+# Database files
+*.db
+*.db.bak
+*.sqlite3
+
+# OS files
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Claude
+.claude/
+
+# Legacy Django app
+lawaai-django-app-main/

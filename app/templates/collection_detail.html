@@ -1,0 +1,148 @@
+{% extends base_template|default("base.html") %}
+{% block title %}Collection{% endblock %}
+
+{% block content %}
+<div x-data="collectionDetail('{{ collection_id }}')" x-init="init()">
+
+    <template x-if="loading">
+        <div style="text-align:center;padding:64px 0;">
+            <div class="spinner"></div>
+            <p class="text-muted mt-12" style="font-size:14px;">Loading collection...</p>
+        </div>
+    </template>
+
+    <template x-if="!loading && collection">
+        <div>
+            <a href="/collections" class="back-link">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                Back to Collections
+            </a>
+
+            <div class="flex items-center justify-between flex-wrap gap-16 mb-24">
+                <div>
+                    <p class="eyebrow">Collection</p>
+                    <h1 class="page-title" x-text="collection.name"></h1>
+                    <p class="text-secondary mt-4" style="font-size:14px;" x-show="collection.description" x-text="collection.description"></p>
+                </div>
+                <div class="flex items-center gap-10">
+                    <button @click="showEdit = true" class="btn-secondary btn-sm">Edit</button>
+                    <button @click="deleteCollection()" class="btn-danger btn-sm">Delete</button>
+                </div>
+            </div>
+
+            <!-- Items -->
+            <template x-if="items.length === 0">
+                <div class="card empty-state">
+                    <div class="empty-icon">
+                        <svg width="28" height="28" fill="none" stroke="var(--deep-teal)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+                    </div>
+                    <h3 class="text-primary mb-8" style="font-size:18px;font-weight:600;">No items yet</h3>
+                    <p class="text-secondary" style="font-size:14px;">Pin reports to this collection from the scout detail page.</p>
+                </div>
+            </template>
+
+            <div class="reports-list">
+                <template x-for="item in items" :key="item.id">
+                    <div class="card card-body">
+                        <div class="flex items-start justify-between gap-12">
+                            <div style="flex:1;min-width:0;">
+                                <a :href="'/scouts/' + item.scout_id" class="text-primary" style="font-size:16px;font-weight:600;text-decoration:none;"
+                                   x-text="item.report_title || 'Untitled Report'"
+                                   onmouseover="this.style.color='var(--mint)'" onmouseout="this.style.color='var(--text-primary)'"></a>
+                                <p class="text-secondary line-clamp-2 mt-4" style="font-size:14px;" x-text="item.report_summary"></p>
+                                <p x-show="item.note" class="text-muted mt-8" style="font-size:13px;font-style:italic;" x-text="item.note"></p>
+                                <p class="text-muted mt-8" style="font-size:12px;" x-text="'Added ' + formatTime(item.created_at)"></p>
+                            </div>
+                            <button @click="removeItem(item)" class="btn-danger btn-sm" style="font-size:11px;padding:4px 10px;flex-shrink:0;">Remove</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </template>
+
+    <!-- Edit Modal -->
+    <template x-if="showEdit">
+        <div style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;"
+             @click.self="showEdit=false" @keydown.escape.window="showEdit=false">
+            <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;width:100%;max-width:420px;">
+                <h3 class="text-primary mb-16" style="font-size:18px;font-weight:600;">Edit Collection</h3>
+                <div class="mb-12">
+                    <label class="text-muted" style="font-size:12px;font-weight:500;display:block;margin-bottom:4px;">Name</label>
+                    <input x-model="editName" type="text" class="input" @keydown.enter="updateCollection()" autofocus />
+                </div>
+                <div class="mb-16">
+                    <label class="text-muted" style="font-size:12px;font-weight:500;display:block;margin-bottom:4px;">Description</label>
+                    <textarea x-model="editDesc" class="input" rows="2"></textarea>
+                </div>
+                <div class="flex items-center justify-end gap-10">
+                    <button @click="showEdit=false" class="btn-secondary btn-sm">Cancel</button>
+                    <button @click="updateCollection()" :disabled="!editName.trim()" class="btn-primary btn-sm">Save</button>
+                </div>
+            </div>
+        </div>
+    </template>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function collectionDetail(collectionId) {
+    return {
+        collectionId,
+        collection: null,
+        items: [],
+        loading: true,
+        showEdit: false,
+        editName: '',
+        editDesc: '',
+
+        async init() {
+            try {
+                const data = await apiCall(`/api/collections/${this.collectionId}`);
+                this.collection = data;
+                this.items = data.items || [];
+                this.editName = data.name;
+                this.editDesc = data.description || '';
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+            this.loading = false;
+        },
+
+        async updateCollection() {
+            const prevName = this.collection.name;
+            const prevDesc = this.collection.description;
+            const nextName = this.editName.trim();
+            const nextDesc = this.editDesc.trim() || null;
+            this.collection.name = nextName;
+            this.collection.description = nextDesc;
+            this.showEdit = false;
+            apiCall(`/api/collections/${this.collectionId}`, 'PUT', { name: nextName, description: nextDesc })
+                .then(() => showToast('Collection updated'))
+                .catch((e) => { this.collection.name = prevName; this.collection.description = prevDesc; showToast(e.message, 'error'); });
+        },
+
+        async deleteCollection() {
+            if (!confirm('Delete this collection? Items will not be affected.')) return;
+            showToast('Collection deleted');
+            navigateTo('/collections');
+            apiCall(`/api/collections/${this.collectionId}`, 'DELETE').catch((e) => showToast(e.message, 'error'));
+        },
+
+        async removeItem(item) {
+            const prev = this.items;
+            this.items = this.items.filter(i => i.id !== item.id);
+            apiCall(`/api/collections/${this.collectionId}/items/${item.id}`, 'DELETE')
+                .then(() => showToast('Item removed'))
+                .catch((e) => { this.items = prev; showToast(e.message, 'error'); });
+        },
+
+        formatTime(iso) {
+            if (!iso) return '';
+            return new Date(iso).toLocaleDateString();
+        },
+    }
+}
+</script>
+{% endblock %}

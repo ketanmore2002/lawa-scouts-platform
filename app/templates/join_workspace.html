@@ -1,0 +1,81 @@
+{% extends base_template|default("base.html") %}
+{% block title %}Join Workspace{% endblock %}
+
+{% block content %}
+<div x-data="joinPage('{{ token }}')" x-init="init()" style="max-width:500px;margin:60px auto;text-align:center;">
+
+    <template x-if="loading">
+        <div>
+            <div class="spinner"></div>
+            <p class="text-muted mt-12" style="font-size:14px;">Loading...</p>
+        </div>
+    </template>
+
+    <template x-if="!loading && error">
+        <div class="card card-body" style="padding:48px 32px;">
+            <div class="empty-icon">
+                <svg width="28" height="28" fill="none" stroke="#f87171" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            </div>
+            <h2 class="text-primary mb-8" style="font-size:20px;font-weight:600;" x-text="error"></h2>
+            <a href="/" class="btn-primary btn-sm mt-20">Go to Dashboard</a>
+        </div>
+    </template>
+
+    <template x-if="!loading && !error && !joined">
+        <div class="card card-body" style="padding:48px 32px;">
+            <div class="empty-icon">
+                <svg width="28" height="28" fill="none" stroke="var(--deep-teal)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+            </div>
+            <p class="eyebrow">Invite Link</p>
+            <h2 class="text-primary mb-16" style="font-size:22px;font-weight:600;">Join Workspace</h2>
+            <p class="text-secondary mb-24" style="font-size:14px;">You've been invited to join a workspace. Click below to join as a viewer.</p>
+            <button @click="join()" class="btn-primary" :disabled="processing">
+                <span x-show="!processing">Join Workspace</span>
+                <span x-show="processing" class="spinner-sm"></span>
+            </button>
+        </div>
+    </template>
+
+    <template x-if="!loading && joined">
+        <div class="card card-body" style="padding:48px 32px;">
+            <div class="empty-icon" style="background:rgba(16,185,129,.15);">
+                <svg width="28" height="28" fill="none" stroke="var(--deep-teal)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <h2 class="text-primary mb-8" style="font-size:20px;font-weight:600;">Welcome!</h2>
+            <p class="text-secondary mb-24" style="font-size:14px;">You've joined <strong class="text-teal" x-text="workspaceName"></strong></p>
+            <a :href="'/workspaces/' + workspaceId" class="btn-primary btn-sm">Open Workspace</a>
+        </div>
+    </template>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function joinPage(token) {
+    return {
+        token,
+        loading: false,
+        error: null,
+        processing: false,
+        joined: false,
+        workspaceId: null,
+        workspaceName: '',
+
+        init() {},
+
+        async join() {
+            this.processing = true;
+            try {
+                const res = await apiCall(`/api/workspaces/join/${this.token}`, 'POST');
+                this.workspaceId = res.workspace_id;
+                this.workspaceName = res.workspace_name || 'the workspace';
+                this.joined = true;
+            } catch (e) {
+                this.error = e.message;
+            }
+            this.processing = false;
+        },
+    }
+}
+</script>
+{% endblock %}

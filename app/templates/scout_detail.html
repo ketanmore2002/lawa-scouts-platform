@@ -1,0 +1,1999 @@
+{% extends base_template|default("base.html") %}
+{% block title %}Scout{% endblock %}
+
+{% block content %}
+<style>
+    /* ── Report Highlights ── */
+    mark.rh {
+        background: var(--hl);
+        border-radius: 2px;
+        padding: 1px 0;
+        cursor: pointer;
+        transition: filter .15s;
+    }
+    mark.rh:hover { filter: brightness(1.15); }
+
+    .hl-popover {
+        position: fixed;
+        transform: translate(-50%, -100%);
+        margin-top: -12px;
+        padding: 14px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        box-shadow: var(--shadow-card);
+        z-index: 200;
+        min-width: 230px;
+    }
+    .hl-color-dot {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 2.5px solid transparent;
+        cursor: pointer;
+        transition: all .15s;
+    }
+    .hl-color-dot:hover { transform: scale(1.15); }
+    .hl-color-active { border-color: var(--text-primary); transform: scale(1.15); }
+
+    .hl-tooltip {
+        position: fixed;
+        transform: translate(-50%, -100%);
+        margin-top: -10px;
+        padding: 10px 14px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: var(--shadow-card);
+        z-index: 200;
+        max-width: 280px;
+    }
+
+    /* ── Carousel ── */
+    .carousel-nav { display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;min-height:40px; }
+    .carousel-btn {
+        display:flex;align-items:center;justify-content:center;
+        width:34px;height:34px;border-radius:10px;
+        border:1px solid var(--border);background:var(--surface);
+        cursor:pointer;color:var(--text-secondary);transition:all .15s;
+    }
+    .carousel-btn:hover:not([disabled]) { border-color:var(--border-light);color:var(--text-primary);background:var(--card); }
+    .carousel-btn[disabled] { opacity:.3;cursor:not-allowed; }
+
+    /* ── Floating Chat (bottom-center pill) ── */
+    .fab-wrap { position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:100;display:flex;flex-direction:column;align-items:center;pointer-events:none; }
+    .fab-wrap > * { pointer-events:auto; }
+    .fab-pill {
+        display:flex;align-items:center;gap:10px;
+        min-width:320px;max-width:calc(100vw - 48px);
+        padding:12px 20px;border-radius:28px;
+        background:linear-gradient(135deg,var(--deep-teal),#059669);
+        border:none;cursor:pointer;color:#fff;
+        font-family:'Inter',sans-serif;font-size:13.5px;font-weight:500;
+        box-shadow:0 6px 24px rgba(16,185,129,.35);transition:all .2s;
+    }
+    .fab-pill:hover { transform:translateY(-2px);box-shadow:0 8px 28px rgba(16,185,129,.45); }
+    .fab-pill-close {
+        width:44px;height:44px;border-radius:50%;
+        background:linear-gradient(135deg,var(--deep-teal),#059669);
+        border:none;cursor:pointer;color:#fff;
+        display:flex;align-items:center;justify-content:center;
+        box-shadow:0 4px 20px rgba(16,185,129,.35);transition:all .2s;
+    }
+    .fab-pill-close:hover { transform:scale(1.08); }
+    .fab-panel {
+        width:480px;max-width:calc(100vw - 48px);max-height:500px;background:var(--card);
+        border:1px solid var(--border);border-radius:16px;
+        box-shadow:0 8px 40px rgba(0,0,0,.25);overflow:hidden;
+        margin-bottom:12px;display:flex;flex-direction:column;
+    }
+
+    /* ── ChatGPT-style composer ── */
+    .gpt-composer-wrap { padding:12px 14px 14px; }
+    .gpt-composer {
+        display:flex;align-items:flex-end;gap:8px;
+        background:var(--card);
+        border:1px solid var(--border);
+        border-radius:26px;
+        padding:10px 10px 10px 18px;
+        box-shadow:0 2px 8px rgba(0,0,0,.04);
+        transition:border-color .15s, box-shadow .15s;
+    }
+    .gpt-composer-focus {
+        border-color:var(--text-muted);
+        box-shadow:0 4px 16px rgba(0,0,0,.08);
+    }
+    .gpt-textarea {
+        flex:1;border:none;outline:none;background:transparent;resize:none;
+        font-family:'Inter',sans-serif;font-size:14px;line-height:1.5;
+        color:var(--text-primary);
+        padding:7px 0;min-height:22px;max-height:160px;overflow-y:auto;
+    }
+    .gpt-textarea::placeholder { color:var(--text-muted); }
+    .gpt-send {
+        display:flex;align-items:center;justify-content:center;
+        width:32px;height:32px;border-radius:50%;
+        border:none;flex-shrink:0;
+        background:var(--border);color:var(--card);
+        cursor:not-allowed;transition:background .15s, transform .1s, opacity .15s;
+        opacity:.7;
+    }
+    .gpt-send-active {
+        background:var(--text-primary);color:var(--card);
+        cursor:pointer;opacity:1;
+    }
+    .gpt-send-active:hover { transform:scale(1.06); }
+
+    /* ── Action bar pills ── */
+    .action-pill {
+        display:inline-flex;align-items:center;gap:5px;
+        padding:5px 12px;border-radius:20px;
+        border:1px solid var(--border);background:var(--surface);
+        font-size:12px;font-weight:500;color:var(--text-muted);
+        cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif;
+    }
+    .action-pill:hover { border-color:var(--border-light);color:var(--text-secondary); }
+    .action-pill-active { background:rgba(16,185,129,.1);border-color:var(--deep-teal);color:var(--deep-teal); }
+    .reaction-pill {
+        display:inline-flex;align-items:center;gap:5px;
+        padding:5px 12px;border-radius:20px;
+        border:1px solid var(--border);font-size:13px;
+        cursor:pointer;transition:all .15s;
+    }
+    .reaction-pill-active { background:rgba(16,185,129,.1);border-color:var(--deep-teal); }
+    .reaction-pill-inactive { background:var(--surface); }
+    .add-reaction-btn {
+        display:inline-flex;align-items:center;justify-content:center;
+        width:32px;height:32px;border-radius:50%;
+        border:1px solid var(--border);background:var(--surface);
+        cursor:pointer;font-size:14px;color:var(--text-muted);transition:all .15s;
+    }
+    .add-reaction-btn:hover { border-color:var(--border-light);color:var(--text-secondary); }
+</style>
+<div x-data="scoutDetail('{{ scout_id }}')" x-init="init()">
+
+    <!-- Loading -->
+    <template x-if="loading">
+        <div style="text-align:center;padding:64px 0;">
+            <div class="spinner"></div>
+            <p class="text-muted mt-12" style="font-size:14px;">Loading scout...</p>
+        </div>
+    </template>
+
+    <template x-if="!loading && scout">
+        <div>
+            <!-- Back -->
+            <a href="/" class="back-link">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                Back to Dashboard
+            </a>
+
+            <!-- Page Title -->
+            <h1 class="page-title mb-12" x-text="scout.topic || scout.name"></h1>
+
+            <!-- Presence Indicators -->
+            <style>
+                .presence-avatar {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    width: 34px !important;
+                    height: 34px !important;
+                    min-width: 34px !important;
+                    min-height: 34px !important;
+                    border-radius: 50% !important;
+                    font-size: 13px !important;
+                    font-weight: 700 !important;
+                    color: #fff !important;
+                    cursor: pointer;
+                    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+                    vertical-align: middle;
+                    position: relative;
+                }
+                .presence-avatar::after {
+                    content: attr(data-tip);
+                    position: absolute;
+                    bottom: calc(100% + 8px);
+                    left: 50%;
+                    transform: translateX(-50%) translateY(4px);
+                    padding: 5px 12px;
+                    border-radius: 6px;
+                    background: var(--card);
+                    border: 1px solid var(--border);
+                    box-shadow: 0 4px 12px rgba(0,0,0,.2);
+                    white-space: nowrap;
+                    font-size: 12px;
+                    font-weight: 500;
+                    color: var(--text-primary);
+                    opacity: 0;
+                    pointer-events: none;
+                    transition: opacity .15s, transform .15s;
+                    z-index: 20;
+                }
+                .presence-avatar:hover::after {
+                    opacity: 1;
+                    transform: translateX(-50%) translateY(0);
+                }
+                .presence-avatar-0 { background: linear-gradient(135deg,#10b981,#059669) !important; }
+                .presence-avatar-1 { background: linear-gradient(135deg,#6366f1,#4f46e5) !important; }
+                .presence-avatar-2 { background: linear-gradient(135deg,#f59e0b,#d97706) !important; }
+                .presence-avatar-3 { background: linear-gradient(135deg,#ec4899,#db2777) !important; }
+                .presence-avatar-4 { background: linear-gradient(135deg,#22d3ee,#06b6d4) !important; }
+                .presence-overflow {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    width: 34px !important;
+                    height: 34px !important;
+                    min-width: 34px !important;
+                    min-height: 34px !important;
+                    border-radius: 50% !important;
+                    font-size: 11px !important;
+                    font-weight: 700 !important;
+                    color: var(--text-secondary) !important;
+                    background: var(--surface) !important;
+                    border: 1px solid var(--border);
+                    vertical-align: middle;
+                }
+            </style>
+            <div x-show="_presenceViewers.length > 0" style="margin-bottom:24px;">
+                <template x-for="(v, vi) in _presenceViewers.slice(0, 5)" :key="v.user_id">
+                    <div class="presence-avatar"
+                         :class="'presence-avatar-' + (vi % 5)"
+                         :data-tip="v.name || v.email"
+                         :style="vi > 0 ? 'margin-left:10px;' : ''"
+                         x-text="(v.name || v.email || '?')[0].toUpperCase()"></div>
+                </template>
+                <template x-if="_presenceViewers.length > 5">
+                    <div class="presence-overflow" style="margin-left:10px;"
+                         x-text="'+' + (_presenceViewers.length - 5)"></div>
+                </template>
+            </div>
+            <div x-show="_presenceViewers.length === 0" style="margin-bottom:24px;"></div>
+
+            <!-- Tab Bar -->
+            <div class="tab-bar">
+                <div class="tab-bar-left">
+                    <button class="tab-btn" :class="{'tab-btn-active': activeTab === 'runs'}" @click="activeTab = 'runs'">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        Runs
+                        <span class="tab-count" x-show="reports.length > 0" x-text="reports.length"></span>
+                    </button>
+                    <button class="tab-btn" :class="{'tab-btn-active': activeTab === 'artifacts'}" @click="activeTab = 'artifacts'">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                        Artifacts
+                        <span class="tab-count" x-show="artifactCount > 0" x-text="artifactCount"></span>
+                    </button>
+                    <button class="tab-btn" :class="{'tab-btn-active': activeTab === 'details'}" @click="activeTab = 'details'">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        Details
+                    </button>
+                </div>
+                <div class="tab-bar-right">
+                    <span class="status-done" x-show="reports.length > 0">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                        Done
+                    </span>
+                    <span :class="scout.status === 'active' ? 'status-active' : 'status-paused'" x-text="scout.status"></span>
+                    <template x-if="canEdit">
+                        <button @click="runNow" :disabled="running" class="btn-primary btn-primary-xs">
+                            <template x-if="running"><div class="spinner-sm"></div></template>
+                            <span x-text="running ? 'Running...' : '+ Run'"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- ═══ RUNS TAB ═══ -->
+            <div x-show="activeTab === 'runs'" x-cloak>
+
+                <!-- Progress Panel -->
+                <template x-if="running && progressSteps.length > 0">
+                    <div class="progress-panel">
+                        <div class="flex items-center gap-10 mb-20">
+                            <div class="analysis-icon">
+                                <div class="spinner-sm" style="color:var(--deep-teal);"></div>
+                            </div>
+                            <p class="text-primary" style="font-size:14px;font-weight:600;">Running Scout</p>
+                        </div>
+                        <div class="flex flex-col gap-4">
+                            <template x-for="(step, si) in progressSteps" :key="si">
+                                <div class="progress-step" :class="step.status === 'done' ? 'progress-step-done' : step.status === 'active' ? 'progress-step-active' : 'progress-step-pending'">
+                                    <div class="progress-step-icon">
+                                        <template x-if="step.status === 'done'">
+                                            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                                        </template>
+                                        <template x-if="step.status === 'active'">
+                                            <div style="width:8px;height:8px;background:var(--deep-teal);border-radius:50%;"></div>
+                                        </template>
+                                        <template x-if="step.status === 'pending'">
+                                            <div style="width:6px;height:6px;background:var(--text-muted);border-radius:50%;opacity:.5;"></div>
+                                        </template>
+                                    </div>
+                                    <span x-text="step.message"></span>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="progress-bar-track">
+                            <div class="progress-bar-fill" :style="'width:' + progressPercent + '%'"></div>
+                        </div>
+                        <p class="mono-pct" x-text="progressPercent + '%'"></p>
+                    </div>
+                </template>
+
+                <!-- Empty State -->
+                <template x-if="reports.length === 0 && !running">
+                    <div class="card empty-state">
+                        <div class="empty-icon">
+                            <svg width="28" height="28" fill="none" stroke="var(--deep-teal)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        </div>
+                        <h3 class="text-primary mb-8" style="font-size:18px;font-weight:600;">No runs yet</h3>
+                        <p class="text-secondary mb-24" style="font-size:14px;" x-text="canEdit ? 'Click \"Run\" to generate the first report.' : 'No reports have been generated yet.'"></p>
+                        <template x-if="canEdit">
+                            <button @click="runNow" :disabled="running" class="btn-primary">
+                                <span x-text="running ? 'Running...' : 'Run Now'"></span>
+                            </button>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- Report Carousel Nav -->
+                <template x-if="reports.length > 1">
+                    <div class="carousel-nav">
+                        <div class="flex items-center gap-10">
+                            <button @click="currentReportIndex = Math.max(0, currentReportIndex - 1)"
+                                    :disabled="currentReportIndex === 0" class="carousel-btn">
+                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
+                            </button>
+                            <span class="text-secondary" style="font-size:13px;font-weight:500;min-width:52px;text-align:center;">
+                                <span x-text="currentReportIndex + 1"></span>
+                                <span class="text-muted" style="font-weight:400;"> / </span>
+                                <span x-text="reports.length"></span>
+                            </span>
+                            <button @click="currentReportIndex = Math.min(reports.length - 1, currentReportIndex + 1)"
+                                    :disabled="currentReportIndex === reports.length - 1" class="carousel-btn">
+                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                            </button>
+                        </div>
+                        <span class="text-muted" style="font-size:12px;" x-text="formatRunDate(reports[currentReportIndex].created_at)"></span>
+                    </div>
+                </template>
+
+                <!-- Run Cards (carousel — one visible at a time) -->
+                <template x-for="(report, reportIndex) in reports" :key="report.id">
+                    <div x-show="reportIndex === currentReportIndex" class="card card-body-lg">
+
+                        <!-- Date + Agent Badge -->
+                        <div class="flex items-center justify-between flex-wrap gap-6" style="margin-bottom:4px;">
+                            <p class="run-date" style="margin-bottom:0;" x-text="formatRunDate(report.created_at)"></p>
+                            <div class="flex items-center flex-wrap gap-6">
+                                <template x-if="getAgentCount(report) > 1">
+                                    <span class="agent-chip">
+                                        <span x-text="getAgentCount(report)"></span> agents
+                                    </span>
+                                </template>
+                                <template x-if="getCharts(report).length > 0">
+                                    <span class="agent-chip">
+                                        <span x-text="getCharts(report).length"></span> chart<span x-show="getCharts(report).length > 1">s</span>
+                                    </span>
+                                </template>
+                                <template x-if="getStrategy(report)">
+                                    <span class="strategy-chip" x-text="getStrategy(report)"></span>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Title -->
+                        <h2 class="run-title" x-text="report.title"></h2>
+
+                        <!-- Change Tracking Badge -->
+                        <template x-if="getChanges(report).hasChanges">
+                            <div style="margin-top:-4px;margin-bottom:16px;">
+                                <div class="flex flex-wrap items-center gap-8">
+                                    <template x-if="getChanges(report).added > 0">
+                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(16,185,129,.12);color:var(--badge-green);border:1px solid rgba(16,185,129,.2);">
+                                            <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"/></svg>
+                                            <span x-text="getChanges(report).added + ' new'"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="getChanges(report).removed > 0">
+                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(239,68,68,.12);color:var(--badge-red);border:1px solid rgba(239,68,68,.2);">
+                                            <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M20 12H4"/></svg>
+                                            <span x-text="getChanges(report).removed + ' removed'"></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="getChanges(report).changed > 0">
+                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(245,158,11,.12);color:var(--badge-amber);border:1px solid rgba(245,158,11,.2);">
+                                            <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16"/></svg>
+                                            <span x-text="getChanges(report).changed + ' updated'"></span>
+                                        </span>
+                                    </template>
+                                    <button @click.stop="toggledChanges === report.id ? toggledChanges = null : toggledChanges = report.id"
+                                            style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;background:var(--surface);color:var(--text-secondary);border:1px solid var(--border);cursor:pointer;transition:all .15s;"
+                                            :style="toggledChanges === report.id ? 'background:var(--deep-teal);color:#fff;border-color:var(--deep-teal);' : ''">
+                                        <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                             :style="toggledChanges === report.id ? 'transform:rotate(90deg)' : ''" style="transition:transform .15s;">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"/>
+                                        </svg>
+                                        <span x-text="toggledChanges === report.id ? 'Hide details' : 'View details'"></span>
+                                    </button>
+                                </div>
+
+                                <!-- Collapsible Change Details -->
+                                <template x-if="toggledChanges === report.id">
+                                    <div style="margin-top:12px;padding:16px;border-radius:12px;background:var(--surface);border:1px solid var(--border);font-size:13px;">
+
+                                        <!-- AI Summary -->
+                                        <template x-if="getChanges(report).summary">
+                                            <p class="text-secondary" style="font-size:13px;line-height:1.6;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);" x-text="getChanges(report).summary"></p>
+                                        </template>
+
+                                        <!-- New Items -->
+                                        <template x-if="getChanges(report).addedItems.length > 0">
+                                            <div style="margin-bottom:14px;">
+                                                <p style="font-weight:600;color:var(--badge-green);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">New</p>
+                                                <template x-for="(item, ai) in getChanges(report).addedItems" :key="'a'+ai">
+                                                    <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;margin-bottom:4px;border-radius:8px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.1);">
+                                                        <span style="color:var(--badge-green);font-weight:700;font-size:13px;">+</span>
+                                                        <span class="text-primary" style="font-weight:500;font-size:13px;" x-text="item"></span>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
+
+                                        <!-- Removed Items -->
+                                        <template x-if="getChanges(report).removedItems.length > 0">
+                                            <div style="margin-bottom:14px;">
+                                                <p style="font-weight:600;color:var(--badge-red);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Removed</p>
+                                                <template x-for="(item, ri) in getChanges(report).removedItems" :key="'r'+ri">
+                                                    <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;margin-bottom:4px;border-radius:8px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.1);">
+                                                        <span style="color:var(--badge-red);font-weight:700;font-size:13px;">&minus;</span>
+                                                        <span class="text-primary" style="font-weight:500;font-size:13px;opacity:.7;" x-text="item"></span>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
+
+                                        <!-- Updated Items (AI-detected real changes) -->
+                                        <template x-if="getChanges(report).updatedItems.length > 0">
+                                            <div>
+                                                <p style="font-weight:600;color:var(--badge-amber);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Updated</p>
+                                                <template x-for="(item, ui) in getChanges(report).updatedItems" :key="'u'+ui">
+                                                    <div style="display:flex;align-items:start;gap:8px;padding:8px 10px;margin-bottom:4px;border-radius:8px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.1);">
+                                                        <span style="color:var(--badge-amber);font-weight:700;font-size:13px;margin-top:1px;">~</span>
+                                                        <div>
+                                                            <span class="text-primary" style="font-weight:600;font-size:13px;" x-text="item.name"></span>
+                                                            <p class="text-muted" style="font-size:12px;margin-top:2px;" x-text="item.change"></p>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+
+                        <!-- Highlightable content area -->
+                        <div @mouseup="handleTextSelection($event, report.id)">
+
+                        <!-- Summary -->
+                        <p class="run-prose" x-html="applyHighlights(formatMarkdown(report.summary || ''), report.id, _hlVersion)"></p>
+
+                        <!-- Narrative Items -->
+                        <template x-if="getRunItems(report).length > 0">
+                            <ul class="run-items">
+                                <template x-for="(item, idx) in getRunItems(report)" :key="idx">
+                                    <li>
+                                        <strong x-text="item.title"></strong><span x-text="item.detail"></span>
+                                        <template x-if="item.source">
+                                            <a :href="item.url || '#'" target="_blank" rel="noopener" class="source-chip" @click.stop>
+                                                <span class="source-chip-dot"></span>
+                                                <span x-text="item.source"></span>
+                                            </a>
+                                        </template>
+                                    </li>
+                                </template>
+                            </ul>
+                        </template>
+
+                        <!-- More items note -->
+                        <template x-if="getRowCount(report) > 8">
+                            <p class="more-items-note">
+                                ...and <strong class="text-secondary" x-text="getRowCount(report) - 8"></strong> more items.
+                            </p>
+                        </template>
+
+                        <!-- Text fallback -->
+                        <template x-if="getRunItems(report).length === 0 && report.raw_response">
+                            <div class="text-fallback" x-html="applyHighlights(formatMarkdown(report.raw_response || ''), report.id, _hlVersion)"></div>
+                        </template>
+
+                        <!-- Artifacts link -->
+                        <template x-if="hasArtifacts(report)">
+                            <p class="run-artifacts-note">
+                                <a href="#" @click.prevent="viewArtifact(report)" class="source-chip source-chip-primary">
+                                    <span class="source-chip-dot"></span>
+                                    LAWA Scouts
+                                </a>
+                            </p>
+                        </template>
+
+                        <!-- Analysis & Key Findings -->
+                        <template x-if="getAnalysis(report)">
+                            <div class="analysis-box">
+                                <div class="flex items-center gap-10 mb-16">
+                                    <div class="analysis-icon">
+                                        <svg width="16" height="16" fill="none" stroke="var(--deep-teal)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                                    </div>
+                                    <p style="font-size:14px;font-weight:700;color:var(--deep-teal);">Analysis & Key Findings</p>
+                                </div>
+                                <div class="text-secondary" style="font-size:14px;line-height:1.8;"
+                                     x-html="applyHighlights(formatAnalysis(getAnalysis(report)), report.id, _hlVersion)"></div>
+                            </div>
+                        </template>
+
+                        <!-- Charts -->
+                        <template x-if="getCharts(report).length > 0">
+                            <div style="margin:24px 0;">
+                                <p class="section-label mb-16">Data Analysis</p>
+                                <div class="flex flex-col gap-24">
+                                    <template x-for="(chart, ci) in getCharts(report)" :key="ci">
+                                        <div class="chart-container">
+                                            <div class="chart-img-wrap">
+                                                <img :src="'data:image/png;base64,' + chart" style="width:100%;height:auto;display:block;border-radius:8px;" :alt="'Chart ' + (ci+1)" />
+                                            </div>
+                                            <template x-if="getChartCommentary(report, ci)">
+                                                <div class="chart-commentary" x-html="formatMarkdown(getChartCommentary(report, ci))"></div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        </div><!-- end highlightable content area -->
+
+                        <!-- Footer -->
+                        <div class="run-footer">
+                            <span>
+                                Report generated by
+                                <strong class="text-secondary" x-text="getAgentCount(report) + ' AI agents'"></strong>, saving you
+                                ~<strong class="text-secondary" x-text="getTimeSaved(report)"></strong> minutes of web browsing time.
+                            </span>
+                            <div class="flex items-center flex-wrap gap-8">
+                                <template x-if="hasExports(report)">
+                                    <div class="flex flex-wrap gap-6">
+                                        <template x-for="ek in getExportKeys(report)" :key="ek">
+                                            <button @click="exportReport(report.id, ek)" class="export-btn">
+                                                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+                                                <span x-text="getExportLabel(ek)"></span>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </template>
+                                <button @click.stop="shareReport(report)" class="sources-toggle">
+                                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                                    Share
+                                </button>
+                                <template x-if="getReportCitations(report).length > 0">
+                                    <button @click="toggledSources === report.id ? toggledSources = null : toggledSources = report.id"
+                                            class="sources-toggle"
+                                            :class="toggledSources === report.id ? 'sources-toggle-active' : ''">
+                                        <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                                        Sources
+                                        <span style="font-size:10px;opacity:.8;" x-text="'(' + getReportCitations(report).length + ')'"></span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- ── Reactions & Actions ── -->
+                        <div class="flex items-center flex-wrap gap-6" style="margin-top:12px;">
+                            <template x-for="r in getReactions(report.id)" :key="r.emoji">
+                                <button @click="toggleReaction(report.id, r.emoji)"
+                                        class="reaction-pill" :class="r.user_reacted ? 'reaction-pill-active' : 'reaction-pill-inactive'"
+                                        :title="r.emoji">
+                                    <span x-text="emojiMap[r.emoji] || r.emoji"></span>
+                                    <span style="font-size:12px;font-weight:600;" :style="r.user_reacted ? 'color:var(--deep-teal);' : 'color:var(--text-secondary);'" x-text="r.count"></span>
+                                </button>
+                            </template>
+                            <div style="position:relative;">
+                                <button @click.stop="showEmojiPicker = showEmojiPicker === report.id ? null : report.id"
+                                        class="add-reaction-btn" title="Add reaction">+</button>
+                                <div x-show="showEmojiPicker === report.id" @click.away="showEmojiPicker = null" x-cloak
+                                     style="position:absolute;bottom:calc(100% + 6px);left:0;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px;display:flex;gap:4px;box-shadow:0 4px 16px rgba(0,0,0,.2);z-index:50;">
+                                    <template x-for="ek in emojiKeys" :key="ek">
+                                        <button @click="toggleReaction(report.id, ek); showEmojiPicker = null"
+                                                style="width:32px;height:32px;border:none;background:transparent;font-size:18px;cursor:pointer;border-radius:6px;transition:background .1s;"
+                                                onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='transparent'"
+                                                x-text="emojiMap[ek]"></button>
+                                    </template>
+                                </div>
+                            </div>
+                            <button @click.stop="openPinModal(report.id)" class="action-pill" style="margin-left:auto;">
+                                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+                                Pin
+                            </button>
+                            <button @click="toggleComments(report.id)" class="action-pill"
+                                    :class="expandedComments === report.id ? 'action-pill-active' : ''">
+                                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                                <span x-text="getCommentCount(report.id) > 0 ? getCommentCount(report.id) + ' Comments' : 'Comment'"></span>
+                            </button>
+                        </div>
+
+                        <!-- Collapsible Sources Panel -->
+                        <template x-if="toggledSources === report.id && getReportCitations(report).length > 0">
+                            <div class="mt-20" style="padding-top:20px;border-top:1px solid var(--border);">
+                                <p class="section-label mb-14">
+                                    Sources &amp; Citations
+                                    <span style="font-weight:400;text-transform:none;letter-spacing:0;" x-text="'(' + getReportCitations(report).length + ' sources)'"></span>
+                                </p>
+                                <div class="flex flex-col gap-8">
+                                    <template x-for="(cite, ci) in getReportCitations(report)" :key="ci">
+                                        <a :href="cite.url" target="_blank" rel="noopener" class="source-link">
+                                            <div class="source-number" x-text="ci + 1"></div>
+                                            <div class="min-w-0 flex-1">
+                                                <p class="text-primary text-truncate" style="font-size:13px;font-weight:500;" x-text="cite.title || cite.url"></p>
+                                                <p class="text-muted text-truncate" style="font-size:11px;" x-text="cite.url"></p>
+                                            </div>
+                                            <svg width="14" height="14" fill="none" stroke="var(--text-muted)" viewBox="0 0 24 24" class="shrink-0"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                        </a>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- ── Comments Section ── -->
+                        <template x-if="expandedComments === report.id">
+                            <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
+                                <p class="section-label" style="margin-bottom:16px;">Comments</p>
+
+                                <!-- Comment List -->
+                                <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:20px;">
+                                    <template x-for="comment in getTopLevelComments(report.id)" :key="comment.id">
+                                        <div style="padding:12px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);">
+                                            <div class="flex items-start gap-10">
+                                                <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;"
+                                                     x-text="(comment.user_name || comment.user_email || '?')[0].toUpperCase()"></div>
+                                                <div style="flex:1;min-width:0;">
+                                                    <div class="flex items-center gap-8" style="margin-bottom:4px;">
+                                                        <span style="font-size:13px;font-weight:600;color:var(--text-primary);" x-text="comment.user_name || comment.user_email"></span>
+                                                        <span class="text-muted" style="font-size:11px;" x-text="timeAgo(comment.created_at)"></span>
+                                                    </div>
+                                                    <p style="font-size:14px;color:var(--text-secondary);line-height:1.6;margin:0;" x-text="comment.content"></p>
+                                                    <div class="flex items-center gap-12" style="margin-top:8px;">
+                                                        <template x-if="canComment">
+                                                            <button @click="setReply(report.id, comment)" style="border:none;background:none;font-size:12px;color:var(--text-muted);cursor:pointer;font-family:'Inter',sans-serif;font-weight:500;padding:0;" onmouseover="this.style.color='var(--mint)'" onmouseout="this.style.color='var(--text-muted)'">Reply</button>
+                                                        </template>
+                                                        <template x-if="comment.user_id === _currentUserId">
+                                                            <button @click="deleteComment(comment.id, report.id)" style="border:none;background:none;font-size:12px;color:var(--badge-red);cursor:pointer;font-family:'Inter',sans-serif;font-weight:500;padding:0;">Delete</button>
+                                                        </template>
+                                                    </div>
+
+                                                    <!-- Replies -->
+                                                    <template x-for="reply in getReplies(report.id, comment.id)" :key="reply.id">
+                                                        <div class="flex items-start gap-8" style="margin-top:12px;padding:10px 12px;border-radius:8px;background:var(--card);border-left:3px solid var(--mint);">
+                                                            <div style="width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;"
+                                                                 x-text="(reply.user_name || reply.user_email || '?')[0].toUpperCase()"></div>
+                                                            <div style="flex:1;min-width:0;">
+                                                                <div class="flex items-center gap-6" style="margin-bottom:2px;">
+                                                                    <span style="font-size:12px;font-weight:600;color:var(--text-primary);" x-text="reply.user_name || reply.user_email"></span>
+                                                                    <span class="text-muted" style="font-size:10px;" x-text="timeAgo(reply.created_at)"></span>
+                                                                </div>
+                                                                <p style="font-size:13px;color:var(--text-secondary);line-height:1.5;margin:0;" x-text="reply.content"></p>
+                                                                <template x-if="reply.user_id === _currentUserId">
+                                                                    <button @click="deleteComment(reply.id, report.id)" style="border:none;background:none;font-size:11px;color:var(--badge-red);cursor:pointer;font-family:'Inter',sans-serif;margin-top:4px;padding:0;">Delete</button>
+                                                                </template>
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <div x-show="getTopLevelComments(report.id).length === 0" class="text-muted" style="font-size:13px;text-align:center;padding:20px 0;">
+                                        No comments yet. Be the first to comment.
+                                    </div>
+                                </div>
+
+                                <!-- Comment Input -->
+                                <template x-if="canComment">
+                                    <div>
+                                        <div x-show="replyTo[report.id]" class="flex items-center gap-6 mb-8" style="font-size:12px;color:var(--text-muted);">
+                                            <span>Replying to comment</span>
+                                            <button @click="cancelReply(report.id)" style="border:none;background:none;color:var(--badge-red);cursor:pointer;font-size:12px;font-family:'Inter',sans-serif;font-weight:500;">Cancel</button>
+                                        </div>
+                                        <div class="flex items-center gap-8">
+                                            <input :x-model="'commentInput[\'' + report.id + '\']'" x-model="commentInput[report.id]"
+                                                   @keydown.enter="postComment(report.id)" type="text" class="input"
+                                                   placeholder="Add a comment..." style="flex:1;font-size:13px;height:40px;border-radius:10px;">
+                                            <button @click="postComment(report.id)" :disabled="!(commentInput[report.id] || '').trim()"
+                                                    style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:10px;border:1px solid var(--border);cursor:pointer;transition:all .15s;flex-shrink:0;"
+                                                    :style="(commentInput[report.id] || '').trim() ? 'background:var(--mint);border-color:var(--mint);color:#fff;' : 'background:var(--surface);color:var(--text-muted);opacity:.5;cursor:not-allowed;'">
+                                                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7-7l7 7-7 7"/></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+            </div>
+
+            <!-- ═══ ARTIFACTS TAB ═══ -->
+            <div x-show="activeTab === 'artifacts'" x-cloak>
+
+                <!-- Empty State -->
+                <template x-if="artifactCount === 0">
+                    <div class="card empty-state">
+                        <div class="empty-icon">
+                            <svg width="28" height="28" fill="none" stroke="var(--deep-teal)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6z"/></svg>
+                        </div>
+                        <h3 class="text-primary mb-8" style="font-size:18px;font-weight:600;">No artifacts yet</h3>
+                        <p class="text-secondary mb-24" style="font-size:14px;" x-text="canEdit ? 'Run the scout to generate downloadable reports, charts, and files.' : 'No artifacts have been generated yet.'"></p>
+                        <template x-if="canEdit">
+                            <button @click="runNow" :disabled="running" class="btn-primary">
+                                <span x-text="running ? 'Running...' : 'Run Now'"></span>
+                            </button>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- Artifacts Content -->
+                <template x-if="artifactCount > 0">
+                    <div>
+                        <!-- Type Filter Pills -->
+                        <div class="flex flex-wrap items-center gap-8 mb-24">
+                            <button @click="artifactFilter = 'all'" class="artifact-filter-pill"
+                                    :class="artifactFilter === 'all' ? 'artifact-filter-active' : ''">
+                                All <span style="margin-left:4px;opacity:.7;" x-text="getAllArtifacts().length"></span>
+                            </button>
+                            <template x-for="type in artifactTypes" :key="type">
+                                <button @click="artifactFilter = type" class="artifact-filter-pill"
+                                        :class="artifactFilter === type ? 'artifact-filter-active' : ''"
+                                        :style="artifactFilter === type ? 'background:' + getArtifactTypeColor(type).text + ';color:#fff;border-color:' + getArtifactTypeColor(type).text : 'background:' + getArtifactTypeColor(type).bg + ';color:' + getArtifactTypeColor(type).text + ';border-color:' + getArtifactTypeColor(type).bg">
+                                    <span x-text="getArtifactTypeLabel(type)"></span>
+                                </button>
+                            </template>
+                        </div>
+
+                        <!-- Artifacts Grid -->
+                        <div class="artifacts-grid">
+                            <template x-for="artifact in filteredArtifacts" :key="artifact.id">
+                                <div class="artifact-card">
+                                    <!-- Preview Area -->
+                                    <div class="artifact-preview">
+                                        <template x-if="artifact.isChart">
+                                            <img :src="'data:image/png;base64,' + artifact.data" style="width:100%;height:100%;object-fit:cover;" />
+                                        </template>
+                                        <template x-if="artifact.type === 'html'">
+                                            <div style="width:100%;height:100%;overflow:hidden;pointer-events:none;">
+                                                <iframe :srcdoc="safeAtob(artifact.data)"
+                                                        style="width:200%;height:200%;transform:scale(0.5);transform-origin:0 0;border:none;"
+                                                        sandbox="allow-same-origin"></iframe>
+                                            </div>
+                                        </template>
+                                        <template x-if="!artifact.isChart && artifact.type !== 'html'">
+                                            <div class="flex flex-col items-center gap-8">
+                                                <svg width="40" height="40" fill="none" stroke="var(--text-muted)" viewBox="0 0 24 24" style="opacity:.35;">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                                                </svg>
+                                                <span class="mono-xs" style="letter-spacing:1px;" x-text="'.' + getExtForType(artifact.type)"></span>
+                                            </div>
+                                        </template>
+                                        <span class="artifact-badge"
+                                              :style="'background:' + getArtifactTypeColor(artifact.type).bg + ';color:' + getArtifactTypeColor(artifact.type).text"
+                                              x-text="getArtifactTypeLabel(artifact.type)"></span>
+                                    </div>
+
+                                    <!-- Card Body -->
+                                    <div class="artifact-body">
+                                        <p class="text-primary text-truncate mb-4" style="font-size:14px;font-weight:600;" x-text="artifact.filename"></p>
+                                        <p class="text-muted line-clamp-2 mb-12" style="font-size:12px;line-height:1.5;" x-text="artifact.description"></p>
+                                        <div class="flex items-center justify-between mb-16">
+                                            <span class="mono-xs" x-text="getArtifactTypeLabel(artifact.type) + ' \u00b7 ' + formatArtifactDate(artifact.createdAt)"></span>
+                                            <span class="mono-xs" x-text="formatFileSize(artifact.sizeBytes)"></span>
+                                        </div>
+                                        <div class="flex gap-8">
+                                            <button @click.stop="downloadArtifact(artifact)" class="export-btn flex-1" style="justify-content:center;height:34px;">
+                                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                </svg>
+                                                Download
+                                            </button>
+                                            <button @click.stop="previewArtifactAction(artifact)"
+                                                    x-show="artifact.isChart || artifact.type === 'html' || artifact.type === 'pdf'"
+                                                    class="icon-btn">
+                                                <svg width="14" height="14" fill="none" stroke="var(--text-secondary)" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Insights -->
+                        <template x-if="selectedReport && isStructured && sd.insights && sd.insights.length > 0">
+                            <div>
+                                    <div class="card card-body mb-24">
+                                        <p class="section-label">Key Insights</p>
+                                        <div class="flex flex-col gap-12">
+                                            <template x-for="(insight, ii) in sd.insights" :key="ii">
+                                                <div class="flex items-start gap-12 text-secondary" style="font-size:14px;line-height:1.65;">
+                                                    <span class="insight-number" x-text="ii + 1"></span>
+                                                    <span x-text="insight"></span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+
+                                    <!-- Sources -->
+                                    <template x-if="citations.length > 0">
+                                        <div class="card card-body">
+                                            <p class="section-label">Sources</p>
+                                            <div class="flex flex-col gap-8">
+                                                <template x-for="(cite, ci) in citations" :key="ci">
+                                                    <a :href="cite.url" target="_blank" rel="noopener" class="source-link">
+                                                        <div class="source-number" x-text="ci + 1"></div>
+                                                        <div class="min-w-0 flex-1">
+                                                            <p class="text-primary text-truncate" style="font-size:13px;font-weight:500;" x-text="cite.title || cite.url"></p>
+                                                            <p class="text-muted text-truncate" style="font-size:11px;" x-text="cite.url"></p>
+                                                        </div>
+                                                        <svg width="14" height="14" fill="none" stroke="var(--text-muted)" viewBox="0 0 24 24" class="shrink-0"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                                    </a>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+            </div>
+
+            <!-- ═══ DETAILS TAB ═══ -->
+            <div x-show="activeTab === 'details'" x-cloak>
+                <div class="card card-body-lg">
+                    <div class="flex flex-col gap-24">
+                        <!-- Name -->
+                        <div>
+                            <span class="section-label">Scout Name</span>
+                            <p class="text-primary mt-4" style="font-size:16px;font-weight:600;" x-text="scout.name"></p>
+                        </div>
+
+                        <!-- Topic -->
+                        <div>
+                            <span class="section-label">Topic</span>
+                            <p class="text-secondary mt-4" style="font-size:15px;" x-text="scout.topic"></p>
+                        </div>
+
+                        <!-- Keywords -->
+                        <template x-if="scout.keywords">
+                            <div>
+                                <span class="section-label">Keywords</span>
+                                <p class="text-secondary mt-4" style="font-size:14px;" x-text="scout.keywords"></p>
+                            </div>
+                        </template>
+
+                        <!-- Description -->
+                        <template x-if="scout.description">
+                            <div>
+                                <span class="section-label">Description</span>
+                                <p class="text-secondary mt-4" style="font-size:14px;" x-text="scout.description"></p>
+                            </div>
+                        </template>
+
+                        <!-- Source Filters -->
+                        <template x-if="scout.include_sources || scout.exclude_sources">
+                            <div>
+                                <span class="section-label">Source Filters</span>
+                                <div class="flex flex-wrap gap-6 mt-8">
+                                    <template x-if="scout.include_sources">
+                                        <template x-for="src in scout.include_sources.split('\n').filter(s => s.trim())" :key="'inc-'+src">
+                                            <span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:500;background:rgba(16,185,129,.1);color:var(--badge-green);border:1px solid rgba(16,185,129,.2);">
+                                                <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                                                <span x-text="src.trim()"></span>
+                                            </span>
+                                        </template>
+                                    </template>
+                                    <template x-if="scout.exclude_sources">
+                                        <template x-for="src in scout.exclude_sources.split('\n').filter(s => s.trim())" :key="'exc-'+src">
+                                            <span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:500;background:rgba(239,68,68,.1);color:var(--badge-red);border:1px solid rgba(239,68,68,.2);">
+                                                <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                <span x-text="src.trim()"></span>
+                                            </span>
+                                        </template>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Grid: Schedule, Last Run, Next Run, Reports -->
+                        <div class="detail-meta-grid">
+                            <template x-if="scout.status !== 'once'">
+                                <div>
+                                    <span class="section-label">Schedule</span>
+                                    <p class="text-secondary mt-4" style="font-weight:500;font-size:14px;" x-text="'Every ' + scout.schedule_minutes + ' min'"></p>
+                                </div>
+                            </template>
+                            <template x-if="scout.status === 'once'">
+                                <div>
+                                    <span class="section-label">Type</span>
+                                    <p class="text-secondary mt-4" style="font-weight:500;font-size:14px;">One-time</p>
+                                </div>
+                            </template>
+                            <div>
+                                <span class="section-label">Last Run</span>
+                                <p class="text-secondary mt-4" style="font-weight:500;font-size:14px;" x-text="scout.last_run_at ? formatTime(scout.last_run_at) : 'Never'"></p>
+                            </div>
+                            <template x-if="scout.status !== 'once'">
+                                <div>
+                                    <span class="section-label">Next Run</span>
+                                    <p class="text-secondary mt-4" style="font-weight:500;font-size:14px;" x-text="scout.next_run_at ? formatTime(scout.next_run_at) : '\u2014'"></p>
+                                </div>
+                            </template>
+                            <div>
+                                <span class="section-label">Total Reports</span>
+                                <p class="text-secondary mt-4" style="font-weight:500;font-size:14px;" x-text="reports.length"></p>
+                            </div>
+                        </div>
+
+                        <!-- Actions (hidden for viewers) -->
+                        <template x-if="canEdit">
+                            <div class="flex flex-wrap gap-10">
+                                <button @click="runNow" :disabled="running" class="btn-primary btn-sm">
+                                    <template x-if="running"><div class="spinner-sm"></div></template>
+                                    <span x-text="running ? 'Running...' : 'Run Now'"></span>
+                                </button>
+                                <button @click="toggleStatus" class="btn-secondary btn-sm"
+                                        x-text="scout.status === 'active' ? 'Pause Scout' : 'Resume Scout'"></button>
+                                <button @click="deleteScout" class="btn-danger btn-sm">Delete Scout</button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </template>
+
+    <!-- ═══ PREVIEW MODAL ═══ -->
+    <template x-if="showPreviewModal && previewArtifact">
+        <div class="preview-backdrop" @click.self="closePreview()" @keydown.escape.window="closePreview()">
+            <div class="preview-modal">
+                <!-- Modal Header -->
+                <div class="preview-header">
+                    <div class="flex items-center gap-12 min-w-0">
+                        <span class="artifact-badge"
+                              :style="'background:' + getArtifactTypeColor(previewArtifact.type).bg + ';color:' + getArtifactTypeColor(previewArtifact.type).text"
+                              x-text="getArtifactTypeLabel(previewArtifact.type)"></span>
+                        <span class="text-primary text-truncate" style="font-size:14px;font-weight:600;" x-text="previewArtifact.filename"></span>
+                    </div>
+                    <div class="flex items-center gap-8 shrink-0">
+                        <button @click="downloadArtifact(previewArtifact)" class="export-btn" style="height:32px;">
+                            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3"/>
+                            </svg>
+                            Download
+                        </button>
+                        <button @click="closePreview()" class="icon-btn" style="width:32px;height:32px;">
+                            <svg width="16" height="16" fill="none" stroke="var(--text-secondary)" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <!-- Modal Body -->
+                <div style="flex:1;overflow:auto;">
+                    <template x-if="previewArtifact.isChart">
+                        <div class="flex items-center justify-center" style="padding:24px;background:var(--surface);min-height:300px;">
+                            <img :src="'data:image/png;base64,' + previewArtifact.data" style="max-width:100%;max-height:70vh;border-radius:8px;" />
+                        </div>
+                    </template>
+                    <template x-if="previewArtifact.type === 'html'">
+                        <iframe :srcdoc="safeAtob(previewArtifact.data)" style="width:100%;height:70vh;border:none;" sandbox="allow-same-origin allow-scripts"></iframe>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- ═══ FLOATING FOLLOW-UP CHAT ═══ -->
+    <template x-if="reports.length > 0 && !loading">
+        <div class="fab-wrap">
+            <!-- Chat Panel -->
+            <div x-show="showFollowUpChat" x-cloak class="fab-panel" @click.stop>
+                <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+                    <span style="font-size:14px;font-weight:600;color:var(--text-primary);">Follow-up Questions</span>
+                    <button @click="showFollowUpChat = false" style="border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:20px;line-height:1;padding:0 4px;font-family:'Inter',sans-serif;">&#215;</button>
+                </div>
+                <div style="flex:1;overflow-y:auto;padding:16px 18px;" x-ref="chatScroll">
+                    <template x-if="chatMessages.length === 0 && !chatLoading">
+                        <p class="text-muted" style="font-size:13px;text-align:center;padding:32px 0;line-height:1.6;">
+                            Ask any question about the current report.
+                        </p>
+                    </template>
+                    <template x-for="(msg, mi) in chatMessages" :key="mi">
+                        <div :style="msg.role === 'user' ? 'text-align:right;margin-bottom:12px;' : 'margin-bottom:12px;'">
+                            <div :style="msg.role === 'user'
+                                ? 'display:inline-block;max-width:85%;padding:10px 14px;border-radius:14px 14px 4px 14px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.2);font-size:13px;color:var(--text-primary);text-align:left;'
+                                : 'max-width:90%;padding:10px 14px;border-radius:14px 14px 14px 4px;background:var(--surface);border:1px solid var(--border);font-size:13px;color:var(--text-secondary);line-height:1.7;'"
+                                x-html="msg.role === 'assistant' ? formatMarkdown(msg.content) : msg.content">
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="chatLoading">
+                        <div style="margin-bottom:12px;">
+                            <div style="display:inline-flex;gap:6px;padding:10px 16px;border-radius:14px;background:var(--surface);border:1px solid var(--border);">
+                                <div class="spinner-sm" style="width:14px;height:14px;color:var(--deep-teal);"></div>
+                                <span class="text-muted" style="font-size:12px;">Thinking...</span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <div class="gpt-composer-wrap">
+                    <div class="gpt-composer" :class="chatInputFocused ? 'gpt-composer-focus' : ''">
+                        <textarea x-model="chatInput"
+                                  @keydown.enter.prevent="if(!$event.shiftKey){ askFollowUp() } else { chatInput += '\n' }"
+                                  @focus="chatInputFocused = true"
+                                  @blur="chatInputFocused = false"
+                                  @input="$event.target.style.height='auto'; $event.target.style.height=Math.min($event.target.scrollHeight,160)+'px'"
+                                  rows="1"
+                                  placeholder="Message Scouts…"
+                                  class="gpt-textarea"
+                                  :disabled="chatLoading"></textarea>
+                        <button @click="askFollowUp()" :disabled="!chatInput.trim() || chatLoading"
+                                class="gpt-send"
+                                :class="chatInput.trim() && !chatLoading ? 'gpt-send-active' : ''">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5m0 0l-6 6m6-6l6 6"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <!-- Pill trigger (collapsed) -->
+            <button x-show="!showFollowUpChat" @click="showFollowUpChat = true" class="fab-pill"
+                    title="Ask a follow-up question">
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                <span>Ask a follow-up…</span>
+            </button>
+            <!-- Close button (when panel open) -->
+            <button x-show="showFollowUpChat" x-cloak @click="showFollowUpChat = false" class="fab-pill-close"
+                    title="Close chat">
+                <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+    </template>
+
+    <!-- ═══ PIN TO COLLECTION MODAL ═══ -->
+    <template x-if="showPinModal">
+        <div style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;"
+             @click.self="showPinModal = null" @keydown.escape.window="showPinModal = null">
+            <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;width:100%;max-width:420px;">
+                <h3 class="text-primary mb-16" style="font-size:18px;font-weight:600;">Pin to Collection</h3>
+                <div class="mb-12">
+                    <label class="text-muted" style="font-size:12px;font-weight:500;display:block;margin-bottom:4px;">Note (optional)</label>
+                    <input x-model="pinNote" type="text" class="input" placeholder="Why are you pinning this?" style="height:38px;font-size:13px;" />
+                </div>
+                <div class="flex flex-col gap-8" style="max-height:240px;overflow-y:auto;">
+                    <template x-for="col in pinCollections" :key="col.id">
+                        <button @click="pinToCollection(col.id, showPinModal)"
+                                style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface);cursor:pointer;text-align:left;transition:all .15s;width:100%;"
+                                onmouseover="this.style.borderColor='var(--deep-teal)';this.style.background='rgba(16,185,129,.06)'" onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--surface)'">
+                            <svg width="16" height="16" fill="none" stroke="var(--text-muted)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+                            <div>
+                                <p style="font-size:14px;font-weight:500;color:var(--text-primary);" x-text="col.name"></p>
+                                <p style="font-size:12px;color:var(--text-muted);" x-text="(col.item_count || 0) + ' items'"></p>
+                            </div>
+                        </button>
+                    </template>
+                    <div x-show="pinCollections.length === 0" class="text-muted" style="font-size:13px;text-align:center;padding:16px 0;">
+                        No collections yet. <a href="/collections" style="color:var(--deep-teal);text-decoration:underline;">Create one</a>
+                    </div>
+                </div>
+                <div class="flex items-center justify-end mt-16">
+                    <button @click="showPinModal = null" class="btn-secondary btn-sm">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- ═══ HIGHLIGHT POPOVER ═══ -->
+    <template x-if="hlPopover">
+        <div class="hl-popover" :style="'left:' + hlPopover.x + 'px;top:' + hlPopover.y + 'px;'" @click.stop @mousedown.stop>
+            <div class="flex items-center gap-6 mb-8">
+                <button @click="hlColor='yellow'" class="hl-color-dot" :class="hlColor==='yellow'?'hl-color-active':''" style="background:rgba(250,204,21,.5)"></button>
+                <button @click="hlColor='green'" class="hl-color-dot" :class="hlColor==='green'?'hl-color-active':''" style="background:rgba(16,185,129,.4)"></button>
+                <button @click="hlColor='blue'" class="hl-color-dot" :class="hlColor==='blue'?'hl-color-active':''" style="background:rgba(99,102,241,.4)"></button>
+                <button @click="hlColor='pink'" class="hl-color-dot" :class="hlColor==='pink'?'hl-color-active':''" style="background:rgba(244,114,182,.4)"></button>
+            </div>
+            <input x-model="hlCaption" @keydown.enter="saveHighlight()" placeholder="Add a note (optional)..." class="input"
+                   style="font-size:12px;height:32px;margin-bottom:8px;border-radius:8px;">
+            <div class="flex gap-6">
+                <button @click="saveHighlight()" class="btn-primary btn-sm" style="flex:1;font-size:11px;height:28px;">Highlight</button>
+                <button @click="hlPopover=null" class="btn-secondary btn-sm" style="font-size:11px;height:28px;">Cancel</button>
+            </div>
+        </div>
+    </template>
+
+    <!-- ═══ HIGHLIGHT TOOLTIP ═══ -->
+    <template x-if="hlTooltip">
+        <div class="hl-tooltip" :style="'left:' + hlTooltip.x + 'px;top:' + hlTooltip.y + 'px;'"
+             @mouseenter="_hlTooltipHover=true" @mouseleave="_hlTooltipHover=false; setTimeout(()=>{if(!_hlTooltipHover)hlTooltip=null},50)">
+            <p x-show="hlTooltip.caption" style="font-size:12px;color:var(--text-primary);margin-bottom:4px;line-height:1.5;" x-text="hlTooltip.caption"></p>
+            <p style="font-size:11px;color:var(--text-muted);" x-text="'— ' + hlTooltip.user"></p>
+            <template x-if="hlTooltip.isOwn">
+                <button @click="deleteHighlight(hlTooltip.hlId, hlTooltip.reportId)"
+                        style="margin-top:6px;padding:2px 8px;font-size:10px;border-radius:4px;border:1px solid rgba(239,68,68,.3);background:transparent;color:var(--badge-red);cursor:pointer;transition:all .15s;"
+                        onmouseover="this.style.background='rgba(239,68,68,.1)'" onmouseout="this.style.background='transparent'">
+                    Remove
+                </button>
+            </template>
+        </div>
+    </template>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function scoutDetail(scoutId) {
+    return {
+        scoutId, scout: null, reports: [], loading: true, running: false,
+        activeTab: 'runs', toggledSources: null, canEdit: true, canComment: true,
+        currentReportIndex: 0, showFollowUpChat: false, chatInputFocused: false,
+
+        /* Progress tracking */
+        progressSteps: [],
+        progressPercent: 0,
+
+        /* Report detail state */
+        selectedReportId: null, selectedReport: null,
+        sd: null, isStructured: false,
+        citations: [],
+
+        /* Follow-up chat */
+        chatMessages: [],
+        chatInput: '',
+        chatLoading: false,
+
+        /* Change tracking cache */
+        _changesCache: {},
+        toggledChanges: null,
+
+        /* Highlights */
+        _highlights: {},
+        _hlVersion: 0,
+        _currentUserId: null,
+        hlPopover: null,
+        hlCaption: '',
+        hlColor: 'yellow',
+        hlTooltip: null,
+        _hlTooltipHover: false,
+        _hlTooltipTimer: null,
+
+        /* Reactions state */
+        _reactions: {},
+        _reactionsVersion: 0,
+        emojiMap: { fire: '\uD83D\uDD25', thumbs_up: '\uD83D\uDC4D', brain: '\uD83E\uDDE0', eyes: '\uD83D\uDC40', rocket: '\uD83D\uDE80', hundred: '\uD83D\uDCAF' },
+        emojiKeys: ['fire', 'thumbs_up', 'brain', 'eyes', 'rocket', 'hundred'],
+        showEmojiPicker: null,
+
+        /* Comments state */
+        _comments: {},
+        _commentsVersion: 0,
+        expandedComments: null,
+        commentInput: {},
+        replyTo: {},
+
+        /* Presence state */
+        _presenceViewers: [],
+        _subscribedReportIds: [],
+        _presenceByReport: {},
+        _wsCleanups: [],
+
+        /* Collections state */
+        showPinModal: null,
+        pinCollections: [],
+        pinNote: '',
+
+        /* Artifacts state */
+        artifactFilter: 'all',
+        previewArtifact: null,
+        showPreviewModal: false,
+
+        get artifactCount() {
+            let count = 0;
+            for (const report of this.reports) {
+                const f = report.findings || {};
+                const exports = f.exports || {};
+                count += Object.keys(exports).filter(k => exports[k] && exports[k].data).length;
+            }
+            return count;
+        },
+
+        getAllArtifacts() {
+            const artifacts = [];
+            for (const report of this.reports) {
+                const f = report.findings || {};
+                const exports = f.exports || {};
+                const meta = f.meta || {};
+                for (const [key, exp] of Object.entries(exports)) {
+                    if (!exp || !exp.data) continue;
+                    const isChart = key.startsWith('chart_');
+                    const type = isChart ? 'chart' : key;
+                    artifacts.push({
+                        id: `${report.id}-${key}`,
+                        reportId: report.id,
+                        reportTitle: report.title,
+                        exportKey: key,
+                        type, isChart,
+                        filename: exp.filename || `${key}.${this.getExtForType(type)}`,
+                        mimeType: exp.mime_type || '',
+                        description: exp.description || this.getDefaultDescription(type),
+                        createdAt: exp.created_at || meta.timestamp || report.created_at,
+                        sizeBytes: exp.size_bytes || Math.ceil((exp.data.length) * 3 / 4),
+                        data: exp.data,
+                    });
+                }
+            }
+            artifacts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            return artifacts;
+        },
+
+        get filteredArtifacts() {
+            const all = this.getAllArtifacts();
+            if (this.artifactFilter === 'all') return all;
+            return all.filter(a => a.type === this.artifactFilter);
+        },
+
+        get artifactTypes() {
+            return [...new Set(this.getAllArtifacts().map(a => a.type))];
+        },
+
+        getExtForType(type) {
+            return { pdf:'pdf', excel:'xlsx', html:'html', csv:'csv', txt:'txt', pptx:'pptx', chart:'png' }[type] || type;
+        },
+        getDefaultDescription(type) {
+            return { pdf:'Formatted PDF report with styled table layout', excel:'Excel spreadsheet with structured data', html:'Interactive HTML page with data table', csv:'Raw CSV data export', txt:'Plain text report', pptx:'PowerPoint presentation with data slides', chart:'Data visualization chart' }[type] || 'Generated file';
+        },
+        getArtifactTypeLabel(type) {
+            return { pdf:'PDF', excel:'EXCEL', html:'HTML', csv:'CSV', txt:'TEXT', pptx:'POWERPOINT', chart:'CHART' }[type] || type.toUpperCase();
+        },
+        getArtifactTypeColor(type) {
+            const map = { pdf:{bg:'rgba(239,68,68,.12)',text:'#f87171'}, excel:{bg:'rgba(16,185,129,.12)',text:'#34d399'}, html:{bg:'rgba(99,102,241,.12)',text:'#818cf8'}, csv:{bg:'rgba(245,158,11,.12)',text:'#fbbf24'}, txt:{bg:'rgba(168,85,247,.12)',text:'#c084fc'}, pptx:{bg:'rgba(251,146,60,.12)',text:'#fb923c'}, chart:{bg:'rgba(34,211,238,.12)',text:'#22d3ee'} };
+            return map[type] || { bg:'var(--surface)', text:'var(--text-secondary)' };
+        },
+        formatFileSize(bytes) {
+            if (!bytes) return '';
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        },
+        formatArtifactDate(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+            return `${months[d.getMonth()]} ${String(d.getDate()).padStart(2,'0')} ${d.getFullYear()}`;
+        },
+        downloadArtifact(artifact) {
+            try {
+                const byteChars = atob(artifact.data);
+                const byteArray = new Uint8Array(byteChars.length);
+                for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
+                const blob = new Blob([byteArray], { type: artifact.mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = artifact.filename;
+                document.body.appendChild(a); a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast(`${artifact.filename} downloaded!`);
+            } catch (e) { showToast('Download failed', 'error'); }
+        },
+        previewArtifactAction(artifact) {
+            if (artifact.isChart || artifact.type === 'html') {
+                this.previewArtifact = artifact;
+                this.showPreviewModal = true;
+            } else if (artifact.type === 'pdf') {
+                try {
+                    const byteChars = atob(artifact.data);
+                    const byteArray = new Uint8Array(byteChars.length);
+                    for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
+                    const blob = new Blob([byteArray], { type: 'application/pdf' });
+                    window.open(URL.createObjectURL(blob), '_blank');
+                } catch (e) { this.downloadArtifact(artifact); }
+            } else {
+                this.downloadArtifact(artifact);
+            }
+        },
+        closePreview() { this.showPreviewModal = false; this.previewArtifact = null; },
+        safeAtob(data) { try { return atob(data); } catch (e) { return '<p>Preview unavailable</p>'; } },
+
+        async init() {
+            try {
+                this.scout = await apiCall(`/api/scouts/${this.scoutId}`);
+                this.reports = await apiCall(`/api/scouts/${this.scoutId}/reports`);
+                this.reports.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                if (this.reports.length > 0) {
+                    this.selectedReportId = this.reports[0].id;
+                    this.loadArtifact(this.reports[0]);
+                }
+                // Determine edit/comment permissions for workspace scouts
+                if (this.scout.workspace_id) {
+                    try {
+                        const [me, members] = await Promise.all([
+                            apiCall('/api/auth/me'),
+                            apiCall(`/api/workspaces/${this.scout.workspace_id}/members`),
+                        ]);
+                        const myMember = members.find(m => m.user_id === me.id);
+                        this.canEdit = myMember ? !['viewer', 'commenter'].includes(myMember.role) : false;
+                        this.canComment = myMember ? myMember.role !== 'viewer' : false;
+                    } catch (e) { this.canEdit = false; this.canComment = false; }
+                }
+            } catch (e) { showToast(e.message, 'error'); }
+            this.loading = false;
+
+            // Get current user ID for highlight ownership checks
+            try { const me = await apiCall('/api/auth/me'); this._currentUserId = me.id; } catch(e) {}
+
+            // Load highlights and reactions for all reports
+            if (this.reports.length > 0) {
+                this._loadAllHighlights();
+                this._loadAllReactions();
+            }
+
+            // Set up highlight tooltip listeners
+            this._initHighlightListeners();
+
+            // Init WebSocket listeners for real-time updates
+            this._initWSListeners();
+
+            // Subscribe to ALL reports so we get comments/reactions/highlights for any report in the carousel
+            if (this.reports.length > 0) {
+                this._connectPresence(this.reports.map(r => r.id));
+            }
+
+            // Clean up WS subscriptions and listeners when leaving the page
+            const self = this;
+            this._onBeforeUnload = () => { self._disconnectPresence(); self._cleanupWSListeners(); };
+            this._onSpaNav = () => { self._disconnectPresence(); self._cleanupWSListeners(); };
+            window.addEventListener('beforeunload', this._onBeforeUnload);
+            window.addEventListener('spa-navigated', this._onSpaNav);
+
+            // Auto-run if redirected from one-time scout creation
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('autorun') === '1' && this.reports.length === 0) {
+                // Clean URL
+                window.history.replaceState({}, '', window.location.pathname);
+                this.$nextTick(() => this.runNow());
+            }
+        },
+
+        loadArtifact(report) {
+            this.selectedReport = report;
+            this.selectedReportId = report.id;
+            const f = report.findings || {};
+            this.citations = f.citations || [];
+            this.sd = null; this.isStructured = false;
+
+            if (f.format === 'structured' && f.structured_data &&
+                Array.isArray(f.structured_data.columns) && Array.isArray(f.structured_data.rows)) {
+                this.sd = f.structured_data;
+                this.isStructured = true;
+            }
+        },
+        selectReport() { const r = this.reports.find(r => r.id == this.selectedReportId); if (r) this.loadArtifact(r); },
+        viewArtifact(report) { this.loadArtifact(report); this.activeTab = 'artifacts'; this.artifactFilter = 'all'; },
+
+        getRunItems(report) {
+            const f = report.findings || {};
+            const sd = f.structured_data;
+            if (!sd || !sd.rows || !sd.columns) return [];
+            const cols = sd.columns;
+            const titleCol = cols.find(c => c.type === 'text');
+            const linkCol = cols.find(c => c.type === 'link');
+            const badgeCol = cols.find(c => c.type === 'badge');
+            const detailCols = cols.filter(c => c !== titleCol && c.type !== 'link' && c !== badgeCol);
+            return sd.rows.slice(0, 8).map(row => {
+                const title = titleCol ? (row[titleCol.key] || '') : '';
+                const parts = detailCols.map(c => { const val = row[c.key]; if (!val || val === '\u2014') return ''; if (Array.isArray(val)) return val.join(', '); return String(val); }).filter(Boolean);
+                return { title, detail: parts.length > 0 ? ' \u2014 ' + parts.join('; ') : '', source: badgeCol ? (row[badgeCol.key] || '') : '', url: linkCol ? (row[linkCol.key] || '') : '' };
+            });
+        },
+        getAnalysis(report) { const sd = (report.findings || {}).structured_data; return (sd && sd.analysis) ? sd.analysis : ''; },
+        getReportCitations(report) { return (report.findings || {}).citations || []; },
+        formatAnalysis(text) {
+            if (!text) return '';
+            return text.split(/\n\n+/).filter(p => p.trim()).map(p => {
+                let escaped = p.trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text-primary);">$1</strong>').replace(/\n/g, '<br>');
+                return '<p style="margin-bottom:14px;">' + escaped + '</p>';
+            }).join('');
+        },
+        hasArtifacts(report) { const exports = (report.findings || {}).exports || {}; return Object.keys(exports).filter(k => exports[k] && exports[k].data).length > 0; },
+        getTimeSaved(report) { const sd = (report.findings || {}).structured_data; if (!sd || !sd.rows) return '5'; return String(Math.max(5, sd.rows.length * 3)); },
+        getAgentCount(report) { return ((report.findings || {}).meta || {}).agents_used || 1; },
+        getCharts(report) { return (report.findings || {}).charts || []; },
+        getSandboxAnalysis(report) { return (report.findings || {}).sandbox_analysis || ''; },
+        getChartCommentary(report, chartIndex) {
+            const analysis = this.getSandboxAnalysis(report);
+            if (!analysis) return '';
+            const charts = this.getCharts(report);
+            if (charts.length <= 1) return analysis;
+            const paragraphs = analysis.split(/\n\n+/).filter(p => p.trim());
+            if (paragraphs.length === 0) return chartIndex === 0 ? analysis : '';
+            const perChart = Math.ceil(paragraphs.length / charts.length);
+            const start = chartIndex * perChart;
+            return paragraphs.slice(start, start + perChart).join('\n\n');
+        },
+        getStrategy(report) { const s = ((report.findings || {}).meta || {}).strategy || ''; if (s === 'serpapi_google_shopping') return 'Product Search'; if (s === 'openai') return 'Multi-Agent Research'; return ''; },
+        getRowCount(report) { const sd = (report.findings || {}).structured_data; return (sd && sd.rows) ? sd.rows.length : 0; },
+        hasExports(report) { return Object.keys((report.findings || {}).exports || {}).length > 0; },
+        getExportKeys(report) { const exports = (report.findings || {}).exports || {}; return Object.keys(exports).filter(k => exports[k] && exports[k].data); },
+        getExportLabel(key) { const labels = { pdf:'PDF', excel:'Excel', html:'HTML', pptx:'PowerPoint', csv:'CSV', txt:'Text' }; if (labels[key]) return labels[key]; if (key.startsWith('chart_')) return 'Chart ' + key.split('_')[1]; return key.toUpperCase(); },
+
+
+        _progressMap: {
+            started:{idx:0,pct:5,label:'Analyzing your query...'},strategy:{idx:1,pct:10,label:'Selecting search strategy'},subtasks:{idx:2,pct:15,label:'Creating research tasks'},agents_running:{idx:3,pct:20,label:'AI agents researching...'},agents_done:{idx:4,pct:50,label:'Research complete'},analysis:{idx:5,pct:60,label:'Writing analysis...'},merged:{idx:6,pct:68,label:'Compiling data'},charts:{idx:7,pct:75,label:'Generating visualizations...'},exports:{idx:8,pct:85,label:'Creating reports...'},saving:{idx:9,pct:95,label:'Saving report...'},complete:{idx:10,pct:100,label:'Done!'},
+        },
+        _initProgressSteps() {
+            const keys = ['started','strategy','subtasks','agents_running','agents_done','analysis','merged','charts','exports','saving','complete'];
+            this.progressSteps = keys.map(k => ({ key: k, message: this._progressMap[k].label, status: 'pending' }));
+        },
+        _handleProgressEvent(data) {
+            const ev = data.event; if (ev === 'heartbeat') return;
+            const mapped = this._progressMap[ev]; if (!mapped) return;
+            const step = this.progressSteps.find(s => s.key === ev);
+            if (step && data.message) step.message = data.message;
+            for (const s of this.progressSteps) { const sm = this._progressMap[s.key]; if (sm.idx < mapped.idx) s.status = 'done'; else if (sm.idx === mapped.idx) s.status = ev === 'complete' ? 'done' : 'active'; else s.status = 'pending'; }
+            this.progressPercent = mapped.pct;
+        },
+
+        async runNow() {
+            this.running = true; this.progressPercent = 0; this._initProgressSteps(); this.activeTab = 'runs';
+            try {
+                const response = await fetch(`/api/scouts/${this.scoutId}/run-stream`, { method: 'POST' });
+                const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = '';
+                while (true) {
+                    const { done, value } = await reader.read(); if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n'); buffer = lines.pop();
+                    for (const line of lines) { if (line.startsWith('data: ')) { try { this._handleProgressEvent(JSON.parse(line.slice(6))); } catch (e) {} } }
+                }
+                if (buffer.startsWith('data: ')) { try { this._handleProgressEvent(JSON.parse(buffer.slice(6))); } catch (e) {} }
+                showToast('Scout run completed!');
+                this.scout = await apiCall(`/api/scouts/${this.scoutId}`);
+                this.reports = await apiCall(`/api/scouts/${this.scoutId}/reports`);
+                this.reports.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                this.currentReportIndex = 0;
+                if (this.reports.length > 0) { this.selectedReportId = this.reports[0].id; this.loadArtifact(this.reports[0]); }
+                this._loadAllHighlights();
+                this._loadAllReactions();
+            } catch (e) { showToast(e.message || 'Run failed', 'error'); }
+            this.running = false; this.progressSteps = [];
+        },
+
+        async toggleStatus() {
+            const prev = this.scout.status;
+            const s = prev === 'active' ? 'paused' : 'active';
+            this.scout = { ...this.scout, status: s };
+            invalidateCache('/api/scouts');
+            try { this.scout = await apiCall(`/api/scouts/${this.scoutId}`, 'PUT', { status: s }); showToast(`Scout ${s === 'active' ? 'resumed' : 'paused'}`); }
+            catch (e) { this.scout = { ...this.scout, status: prev }; showToast(e.message, 'error'); }
+        },
+        exportReport(reportId, type) {
+            const report = this.reports.find(r => r.id == reportId);
+            if (!report) { showToast('Report not found', 'error'); return; }
+            const exp = ((report.findings || {}).exports || {})[type];
+            if (!exp || !exp.data) { showToast(`No ${type.toUpperCase()} export available`, 'error'); return; }
+            const byteChars = atob(exp.data); const byteArray = new Uint8Array(byteChars.length);
+            for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
+            const blob = new Blob([byteArray], { type: exp.mime_type });
+            const url = URL.createObjectURL(blob); const a = document.createElement('a');
+            a.href = url; a.download = exp.filename; document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url); showToast(`${type.toUpperCase()} downloaded!`);
+        },
+        async deleteScout() {
+            if (!confirm('Delete this scout and all its reports?')) return;
+            invalidateCache('/api/scouts');
+            showToast('Scout deleted');
+            navigateTo('/');
+            apiCall(`/api/scouts/${this.scoutId}`, 'DELETE').catch((e) => showToast(e.message, 'error'));
+        },
+
+        /* ── Share ── */
+        async shareReport(report) {
+            try {
+                const resp = await apiCall(`/api/reports/${report.id}/share`, 'POST');
+                const url = `${window.location.origin}/shared/${resp.share_token}`;
+                await navigator.clipboard.writeText(url);
+                showToast('Share link copied to clipboard!');
+            } catch (e) { showToast(e.message || 'Failed to share', 'error'); }
+        },
+
+        /* ── Change Tracking ── */
+        getChanges(report) {
+            if (this._changesCache[report.id]) return this._changesCache[report.id];
+            const empty = { hasChanges: false, added: 0, removed: 0, changed: 0, addedItems: [], removedItems: [], updatedItems: [], summary: '' };
+
+            // Use AI-generated changes if available (from scout_runner)
+            const sd = ((report.findings || {}).structured_data || {});
+            if (sd.changes) {
+                const ch = sd.changes;
+                const result = {
+                    hasChanges: ch.has_real_changes || false,
+                    added: (ch.new_items || []).length,
+                    removed: (ch.removed_items || []).length,
+                    changed: (ch.updated_items || []).length,
+                    addedItems: ch.new_items || [],
+                    removedItems: ch.removed_items || [],
+                    updatedItems: ch.updated_items || [],
+                    changedItems: [],
+                    summary: ch.summary || '',
+                };
+                this._changesCache[report.id] = result;
+                return result;
+            }
+
+            // Fallback: no previous report or no AI changes
+            this._changesCache[report.id] = empty;
+            return empty;
+        },
+
+        /* ── Follow-up Chat ── */
+        async askFollowUp() {
+            const q = this.chatInput.trim();
+            if (!q) return;
+            const reportId = this.reports.length > 0 ? this.reports[this.currentReportIndex].id : null;
+            if (!reportId) return;
+
+            this.chatMessages.push({ role: 'user', content: q });
+            this.chatInput = '';
+            this.chatLoading = true;
+
+            try {
+                const resp = await apiCall('/api/reports/follow-up', 'POST', {
+                    question: q,
+                    report_id: reportId,
+                });
+                this.chatMessages.push({ role: 'assistant', content: resp.answer });
+            } catch (e) {
+                this.chatMessages.push({ role: 'assistant', content: 'Sorry, I couldn\'t process that question. Please try again.' });
+            }
+            this.chatLoading = false;
+        },
+
+        /* ── Highlights ── */
+        async _loadAllHighlights() {
+            const promises = this.reports.map(async (report) => {
+                try {
+                    this._highlights[report.id] = await apiCall(`/api/reports/${report.id}/highlights`);
+                } catch (e) { this._highlights[report.id] = []; }
+            });
+            await Promise.all(promises);
+            this._hlVersion++;
+        },
+
+        applyHighlights(html, reportId) {
+            // Reference _hlVersion so Alpine re-evaluates when highlights change
+            void this._hlVersion;
+            const hls = this._highlights[reportId] || [];
+            if (!hls.length) return html;
+            let result = html;
+            for (const hl of hls) {
+                const text = hl.selected_text;
+                if (!text) continue;
+                const idx = result.indexOf(text);
+                if (idx === -1) continue;
+                const mark = `<mark class="rh" data-caption="${this._escAttr(hl.caption||'')}" data-user="${this._escAttr(hl.user_name||hl.user_email||'')}" data-hlid="${hl.id}" data-uid="${hl.user_id}" data-reportid="${reportId}" style="--hl:${this._hlColorVal(hl.color)}">`;
+                result = result.slice(0, idx) + mark + result.slice(idx, idx + text.length) + '</mark>' + result.slice(idx + text.length);
+            }
+            return result;
+        },
+
+        _escAttr(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); },
+        _hlColorVal(color) {
+            return ({ yellow:'rgba(250,204,21,.3)', green:'rgba(16,185,129,.25)', blue:'rgba(99,102,241,.25)', pink:'rgba(244,114,182,.25)' })[color] || 'rgba(250,204,21,.3)';
+        },
+
+        handleTextSelection(event, reportId) {
+            // Don't trigger on button/input clicks
+            if (event.target.closest('button, input, a, select')) return;
+            const sel = window.getSelection();
+            if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
+            const text = sel.toString().trim();
+            if (text.length < 2 || text.length > 1000) return;
+            const range = sel.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            this.hlPopover = { x: rect.left + rect.width / 2, y: rect.top, text, reportId };
+            this.hlCaption = '';
+            this.hlColor = 'yellow';
+        },
+
+        async saveHighlight() {
+            if (!this.hlPopover) return;
+            const { text, reportId } = this.hlPopover;
+            const caption = this.hlCaption.trim() || null;
+            const color = this.hlColor;
+
+            // Close the popover and clear the selection immediately — feels instant.
+            this.hlPopover = null;
+            window.getSelection().removeAllRanges();
+
+            // Optimistic insert with a temp id; reconcile after the server responds.
+            const tempId = 'tmp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+            const optimistic = {
+                id: tempId,
+                report_id: reportId,
+                user_id: this._currentUserId,
+                user_name: null,
+                user_email: '',
+                selected_text: text,
+                caption,
+                color,
+                created_at: new Date().toISOString(),
+            };
+            if (!this._highlights[reportId]) this._highlights[reportId] = [];
+            this._highlights[reportId] = [...this._highlights[reportId], optimistic];
+            this._hlVersion++;
+
+            try {
+                const hl = await apiCall(`/api/reports/${reportId}/highlights`, 'POST', {
+                    selected_text: text,
+                    caption,
+                    color,
+                });
+                // Swap the temp entry for the real server row.
+                this._highlights[reportId] = this._highlights[reportId].map(h =>
+                    h.id === tempId ? hl : h
+                );
+                this._hlVersion++;
+            } catch (e) {
+                // Rollback on failure.
+                this._highlights[reportId] = this._highlights[reportId].filter(h => h.id !== tempId);
+                this._hlVersion++;
+                showToast(e.message || 'Failed to save highlight', 'error');
+            }
+        },
+
+        async deleteHighlight(hlId, reportId) {
+            try {
+                await apiCall(`/api/highlights/${hlId}`, 'DELETE');
+                if (this._highlights[reportId]) {
+                    this._highlights[reportId] = this._highlights[reportId].filter(h => h.id !== hlId);
+                }
+                this._hlVersion++;
+                this.hlTooltip = null;
+                showToast('Highlight removed');
+            } catch (e) { showToast(e.message || 'Failed to remove', 'error'); }
+        },
+
+        _initHighlightListeners() {
+            const self = this;
+            // Tooltip on hover over highlights
+            document.addEventListener('mouseover', function(e) {
+                const mark = e.target.closest('mark.rh');
+                if (!mark) return;
+                clearTimeout(self._hlTooltipTimer);
+                const rect = mark.getBoundingClientRect();
+                self.hlTooltip = {
+                    x: rect.left + rect.width / 2,
+                    y: rect.top,
+                    caption: mark.dataset.caption || '',
+                    user: mark.dataset.user || '',
+                    hlId: mark.dataset.hlid || '',
+                    reportId: mark.dataset.reportid || '',
+                    isOwn: mark.dataset.uid === self._currentUserId,
+                };
+            });
+            document.addEventListener('mouseout', function(e) {
+                const mark = e.target.closest('mark.rh');
+                if (!mark) return;
+                self._hlTooltipTimer = setTimeout(() => {
+                    if (!self._hlTooltipHover) self.hlTooltip = null;
+                }, 200);
+            });
+            // Dismiss popover on outside click
+            document.addEventListener('mousedown', function(e) {
+                if (self.hlPopover && !e.target.closest('.hl-popover')) {
+                    self.hlPopover = null;
+                }
+            });
+            // Dismiss popover on scroll
+            document.addEventListener('scroll', function() { self.hlPopover = null; }, true);
+        },
+
+        /* ── Reactions ── */
+        async _loadAllReactions() {
+            for (const report of this.reports) {
+                try {
+                    this._reactions[report.id] = await apiCall(`/api/reports/${report.id}/reactions`);
+                } catch (e) { this._reactions[report.id] = []; }
+            }
+            this._reactionsVersion++;
+        },
+        getReactions(reportId) {
+            void this._reactionsVersion;
+            return this._reactions[reportId] || [];
+        },
+        async toggleReaction(reportId, emoji) {
+            // Optimistic local update — instant feedback, no round-trip.
+            const prev = (this._reactions[reportId] || []).map(r => ({ ...r }));
+            const next = [...prev];
+            const existing = next.find(r => r.emoji === emoji);
+            if (existing) {
+                if (existing.user_reacted) {
+                    existing.count = Math.max(0, existing.count - 1);
+                    existing.user_reacted = false;
+                } else {
+                    existing.count += 1;
+                    existing.user_reacted = true;
+                }
+            } else {
+                next.push({ emoji, count: 1, user_reacted: true });
+            }
+            this._reactions[reportId] = next.filter(r => r.count > 0);
+            this._reactionsVersion++;
+
+            try {
+                await apiCall(`/api/reports/${reportId}/reactions`, 'POST', { emoji });
+            } catch (e) {
+                // Rollback on failure.
+                this._reactions[reportId] = prev;
+                this._reactionsVersion++;
+                showToast(e.message, 'error');
+            }
+        },
+
+        /* ── Comments ── */
+        async loadComments(reportId, skipCache = false) {
+            try {
+                const comments = await apiCall(`/api/reports/${reportId}/comments`, 'GET', null, skipCache ? { noCache: true } : {});
+                this._comments[reportId] = comments;
+                this._commentsVersion++;
+            } catch (e) { showToast(e.message, 'error'); }
+        },
+        getTopLevelComments(reportId) {
+            void this._commentsVersion;
+            return (this._comments[reportId] || []).filter(c => !c.parent_id);
+        },
+        getReplies(reportId, parentId) {
+            void this._commentsVersion;
+            return (this._comments[reportId] || []).filter(c => c.parent_id === parentId);
+        },
+        getCommentCount(reportId) {
+            void this._commentsVersion;
+            return (this._comments[reportId] || []).length;
+        },
+        async toggleComments(reportId) {
+            if (this.expandedComments === reportId) {
+                this.expandedComments = null;
+            } else {
+                this.expandedComments = reportId;
+                if (!this._comments[reportId]) await this.loadComments(reportId);
+            }
+        },
+        async postComment(reportId) {
+            const content = (this.commentInput[reportId] || '').trim();
+            if (!content) return;
+            const parentId = this.replyTo[reportId] || null;
+            // Clear input immediately so the UI feels instant.
+            this.commentInput[reportId] = '';
+            this.replyTo[reportId] = null;
+            try {
+                const created = await apiCall(`/api/reports/${reportId}/comments`, 'POST', { content, parent_id: parentId });
+                if (!this._comments[reportId]) this._comments[reportId] = [];
+                // Avoid dupes in case the WS echo arrives somehow.
+                if (!this._comments[reportId].some(c => String(c.id) === String(created.id))) {
+                    this._comments[reportId] = [...this._comments[reportId], created];
+                    this._commentsVersion++;
+                }
+            } catch (e) {
+                // Restore the user's draft so they don't lose it.
+                this.commentInput[reportId] = content;
+                this.replyTo[reportId] = parentId;
+                showToast(e.message, 'error');
+            }
+        },
+        async deleteComment(commentId, reportId) {
+            if (!confirm('Delete this comment?')) return;
+            // Optimistic remove.
+            const prev = this._comments[reportId] || [];
+            this._comments[reportId] = prev.filter(c => String(c.id) !== String(commentId));
+            this._commentsVersion++;
+            try {
+                await apiCall(`/api/comments/${commentId}`, 'DELETE');
+                showToast('Comment deleted');
+            } catch (e) {
+                this._comments[reportId] = prev;
+                this._commentsVersion++;
+                showToast(e.message, 'error');
+            }
+        },
+        setReply(reportId, comment) {
+            this.replyTo[reportId] = comment.id;
+            this.commentInput[reportId] = `@${comment.user_email} `;
+        },
+        cancelReply(reportId) {
+            this.replyTo[reportId] = null;
+            this.commentInput[reportId] = '';
+        },
+
+        /* ── WebSocket: Listeners + Presence (unified) ── */
+        _initWSListeners() {
+            if (!window.LawaWS) return;
+            const self = this;
+            this._cleanupWSListeners();
+
+            // Helper: send subscribe for all tracked reports
+            function subscribeAll() {
+                for (const rid of self._subscribedReportIds) {
+                    window.LawaWS.send({ action: 'subscribe_report', report_id: rid });
+                }
+            }
+
+            // On every WS (re)connection: re-subscribe to reports
+            // This handles initial connect AND reconnects after drops
+            const offConnected = window.LawaWS.on('connected', () => {
+                subscribeAll();
+            });
+            // Also subscribe now if already connected
+            if (window.LawaWS.connected) subscribeAll();
+
+            // Presence updates — track per-report, then union for display.
+            const offPresence = window.LawaWS.on('presence', (data) => {
+                if (!data.report_id || !Array.isArray(data.viewers)) return;
+                self._presenceByReport[data.report_id] = data.viewers;
+                const seen = new Map();
+                for (const vl of Object.values(self._presenceByReport)) {
+                    for (const v of vl) if (v && v.user_id) seen.set(v.user_id, v);
+                }
+                self._presenceViewers = [...seen.values()];
+            });
+
+            // Real-time comments from other users
+            const offComment = window.LawaWS.on('new_comment', (data) => {
+                const reportId = data.report_id;
+                if (!reportId) return;
+                if (!self._comments[reportId]) self._comments[reportId] = [];
+                // Guard against dupes (e.g. our own echo).
+                if (!self._comments[reportId].some(c => String(c.id) === String(data.id))) {
+                    self._comments[reportId] = [...self._comments[reportId], data];
+                    self._commentsVersion++;
+                }
+            });
+
+            // Real-time comment deletions
+            const offCommentDel = window.LawaWS.on('comment_deleted', (data) => {
+                const { report_id: reportId, id } = data;
+                if (!reportId || !id) return;
+                if (self._comments[reportId]) {
+                    self._comments[reportId] = self._comments[reportId].filter(c => String(c.id) !== String(id));
+                    self._commentsVersion++;
+                }
+            });
+
+            // Real-time reaction updates from other users — patch local state, no refetch.
+            const offReaction = window.LawaWS.on('reaction_update', (data) => {
+                const { report_id: reportId, emoji, action } = data;
+                if (!reportId || !emoji) return;
+                const list = [...(self._reactions[reportId] || [])];
+                const existing = list.find(r => r.emoji === emoji);
+                if (action === 'added') {
+                    if (existing) existing.count += 1;
+                    else list.push({ emoji, count: 1, user_reacted: false });
+                } else if (action === 'removed' && existing) {
+                    existing.count = Math.max(0, existing.count - 1);
+                }
+                self._reactions[reportId] = list.filter(r => r.count > 0);
+                self._reactionsVersion++;
+            });
+
+            // Real-time highlights from other users
+            const offHighlight = window.LawaWS.on('new_highlight', (data) => {
+                const reportId = data.report_id;
+                if (!reportId) return;
+                if (!self._highlights[reportId]) self._highlights[reportId] = [];
+                self._highlights[reportId] = [...self._highlights[reportId], data];
+                self._hlVersion++;
+            });
+
+            // Highlight deleted by another user
+            const offHlDelete = window.LawaWS.on('highlight_deleted', (data) => {
+                const reportId = data.report_id;
+                const hlId = data.id;
+                if (!reportId || !hlId) return;
+                if (self._highlights[reportId]) {
+                    self._highlights[reportId] = self._highlights[reportId].filter(h => String(h.id) !== String(hlId));
+                    self._hlVersion++;
+                }
+            });
+
+            this._wsCleanups = [offConnected, offPresence, offComment, offCommentDel, offReaction, offHighlight, offHlDelete];
+        },
+
+        _connectPresence(reportIds) {
+            this._subscribedReportIds = reportIds;
+            // Subscribe now if WS is already connected; otherwise the
+            // 'connected' handler registered in _initWSListeners will do it
+            if (window.LawaWS && window.LawaWS.connected) {
+                for (const rid of this._subscribedReportIds) {
+                    window.LawaWS.send({ action: 'subscribe_report', report_id: rid });
+                }
+            }
+        },
+
+        _disconnectPresence() {
+            if (window.LawaWS && window.LawaWS.connected) {
+                for (const rid of this._subscribedReportIds) {
+                    window.LawaWS.send({ action: 'unsubscribe_report', report_id: rid });
+                }
+            }
+            this._subscribedReportIds = [];
+            this._presenceByReport = {};
+            this._presenceViewers = [];
+        },
+
+        _cleanupWSListeners() {
+            if (this._wsCleanups) {
+                this._wsCleanups.forEach(fn => { if (fn) fn(); });
+                this._wsCleanups = [];
+            }
+        },
+
+        /* ── Collections Pin ── */
+        async openPinModal(reportId) {
+            this.showPinModal = reportId;
+            this.pinNote = '';
+            try {
+                this.pinCollections = await apiCall('/api/collections');
+            } catch (e) { this.pinCollections = []; }
+        },
+        async pinToCollection(collectionId, reportId) {
+            try {
+                await apiCall(`/api/collections/${collectionId}/items`, 'POST', {
+                    report_id: reportId,
+                    note: this.pinNote.trim() || null,
+                });
+                showToast('Pinned to collection!');
+                this.showPinModal = null;
+            } catch (e) { showToast(e.message, 'error'); }
+        },
+
+        /* ── Time Helpers ── */
+        timeAgo(iso) {
+            if (!iso) return '';
+            const diff = Date.now() - new Date(iso).getTime();
+            const mins = Math.floor(diff / 60000);
+            if (mins < 1) return 'just now';
+            if (mins < 60) return mins + 'm ago';
+            const hrs = Math.floor(mins / 60);
+            if (hrs < 24) return hrs + 'h ago';
+            const days = Math.floor(hrs / 24);
+            if (days < 7) return days + 'd ago';
+            return new Date(iso).toLocaleDateString();
+        },
+
+        formatRunDate(iso) {
+            if (!iso) return '';
+            const d = new Date(iso); const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+            const h = d.getHours(); const ampm = h >= 12 ? 'PM' : 'AM'; const h12 = h % 12 || 12;
+            return `${months[d.getMonth()]} ${String(d.getDate()).padStart(2,'0')}, ${d.getFullYear()} AT ${h12}:${String(d.getMinutes()).padStart(2,'0')}${ampm}`;
+        },
+        formatTime(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            return d.toLocaleDateString('en-US', {month:'2-digit',day:'2-digit',year:'numeric'}) + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+        },
+        formatMarkdown(text) {
+            return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\[(.*?)\]\((https?:\/\/.*?)\)/g, '<a href="$2" target="_blank" style="color:var(--deep-teal);text-decoration:underline;">$1</a>').replace(/^- /gm, '&bull; ').replace(/\n/g, '<br>');
+        }
+    }
+}
+</script>
+{% endblock %}

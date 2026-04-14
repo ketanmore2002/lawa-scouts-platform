@@ -1,0 +1,77 @@
+{% extends base_template|default("base.html") %}
+{% block title %}Sign In — LAWA Scouts{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 200px);padding:0 16px;">
+    <div class="wizard-card" x-data="loginForm()" style="max-width:440px;">
+        <div class="wizard-body" style="text-align:center;">
+            <div style="margin-bottom:32px;">
+                <div style="display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:16px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);margin-bottom:20px;">
+                    <svg width="28" height="28" fill="none" stroke="var(--mint)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                </div>
+                <h2 class="wizard-title" style="margin-bottom:8px;">Welcome to LAWA Scouts</h2>
+                <p class="text-muted" style="font-size:14px;">Sign in with your LAWA account to continue</p>
+            </div>
+
+            <div x-show="error" x-cloak
+                 style="margin-bottom:20px;padding:12px 16px;border-radius:10px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:#f87171;font-size:13px;text-align:left;">
+                <span x-text="error"></span>
+            </div>
+
+            <form @submit.prevent="submit()">
+                <div style="margin-bottom:16px;text-align:left;">
+                    <label class="text-muted" style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">Email</label>
+                    <input x-model="username" type="text" class="input" placeholder="your@email.com" autofocus
+                           style="font-size:15px;padding:12px 16px;">
+                </div>
+                <div style="margin-bottom:24px;text-align:left;">
+                    <label class="text-muted" style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">Password</label>
+                    <input x-model="password" type="password" class="input" placeholder="Enter your password"
+                           style="font-size:15px;padding:12px 16px;">
+                </div>
+                <button type="submit" :disabled="!username.trim() || !password || submitting" class="wizard-next" style="width:100%;justify-content:center;">
+                    <template x-if="submitting"><div class="spinner-sm"></div></template>
+                    <span x-text="submitting ? 'Signing in...' : 'Sign in'"></span>
+                </button>
+            </form>
+
+            <p class="text-muted" style="font-size:12px;margin-top:24px;">
+                Don't have an account? <a href="https://lawa.app" target="_blank" style="color:var(--mint);text-decoration:none;font-weight:500;">Sign up at lawa.app</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loginForm() {
+    return {
+        username: '',
+        password: '',
+        error: '',
+        submitting: false,
+
+        async submit() {
+            this.error = '';
+            this.submitting = true;
+            try {
+                const resp = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: this.username.trim(), password: this.password }),
+                });
+                if (!resp.ok) {
+                    const data = await resp.json();
+                    throw new Error(data.detail || 'Login failed');
+                }
+                window.location.href = '/';
+            } catch (e) {
+                this.error = e.message;
+            }
+            this.submitting = false;
+        }
+    }
+}
+</script>
+{% endblock %}
