@@ -1187,6 +1187,7 @@ function scoutDetail(scoutId) {
         /* Comments state */
         _comments: {},
         _commentsVersion: 0,
+        _commentsLoaded: {}, // reportId → true once the history has been fetched from the server
         expandedComments: null,
         commentInput: {},
         replyTo: {},
@@ -1760,7 +1761,15 @@ function scoutDetail(scoutId) {
         async loadComments(reportId, skipCache = false) {
             try {
                 const comments = await apiCall(`/api/reports/${reportId}/comments`, 'GET', null, skipCache ? { noCache: true } : {});
-                this._comments[reportId] = comments;
+                // Merge with any optimistic / WS-delivered comments already in memory so
+                // we don't drop comments that arrived between creation and fetch.
+                const existing = this._comments[reportId] || [];
+                const byId = new Map();
+                for (const c of comments) byId.set(String(c.id), c);
+                for (const c of existing) if (!byId.has(String(c.id))) byId.set(String(c.id), c);
+                this._comments[reportId] = Array.from(byId.values())
+                    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                this._commentsLoaded[reportId] = true;
                 this._commentsVersion++;
             } catch (e) { showToast(e.message, 'error'); }
         },
@@ -1781,7 +1790,9 @@ function scoutDetail(scoutId) {
                 this.expandedComments = null;
             } else {
                 this.expandedComments = reportId;
-                if (!this._comments[reportId]) await this.loadComments(reportId);
+                // Always fetch the full history the first time the panel is opened,
+                // even if WS/optimistic comments have populated the cache already.
+                if (!this._commentsLoaded[reportId]) await this.loadComments(reportId);
             }
         },
         async postComment(reportId) {
