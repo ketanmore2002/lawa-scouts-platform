@@ -46,8 +46,14 @@
         try {
             const u = new URL(url, window.location.origin);
             if (u.origin !== window.location.origin) return false;
-            // Don't SPA-navigate auth, API, static, or WS routes
-            const skip = ['/login', '/api/', '/static/', '/ws', '/shared/'];
+            // Don't SPA-navigate auth, API, static, or WS routes.
+            // Also skip WS-heavy pages (scout detail, report detail, workspace)
+            // and pages with position:fixed chrome — SPA partial swap leaves stale
+            // websocket listeners and orphaned fixed elements; full reload is safer.
+            const skip = [
+                '/login', '/api/', '/static/', '/ws', '/shared/',
+                '/scouts/', '/reports/', '/workspaces/',
+            ];
             return !skip.some(s => u.pathname.startsWith(s));
         } catch {
             return false;

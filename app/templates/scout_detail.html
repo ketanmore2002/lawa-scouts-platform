@@ -1471,7 +1471,13 @@ function scoutDetail(scoutId) {
                 this.reports = await apiCall(`/api/scouts/${this.scoutId}/reports`);
                 this.reports.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
                 this.currentReportIndex = 0;
-                if (this.reports.length > 0) { this.selectedReportId = this.reports[0].id; this.loadArtifact(this.reports[0]); }
+                if (this.reports.length > 0) {
+                    this.selectedReportId = this.reports[0].id;
+                    this.loadArtifact(this.reports[0]);
+                    // Jump to the report view so the user sees the result, not the runs tab.
+                    this.activeTab = 'artifacts';
+                    this.artifactFilter = 'all';
+                }
                 this._loadAllHighlights();
                 this._loadAllReactions();
             } catch (e) { showToast(e.message || 'Run failed', 'error'); }

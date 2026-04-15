@@ -1583,9 +1583,12 @@ select.input { cursor: pointer; }
 .main-content.spa-entering {
     animation: spaFadeIn .2s ease both;
 }
+/* NOTE: do NOT animate `transform` on .main-content — it creates a containing
+   block, which breaks position:fixed descendants (e.g. the follow-up FAB).
+   Fade opacity only. */
 @keyframes spaFadeIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; }
+    to   { opacity: 1; }
 }
 
 /* ══════════════════════════════════════
