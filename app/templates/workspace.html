@@ -493,17 +493,23 @@ function workspacePage(workspaceId) {
         },
 
         async loadActivity() {
-            if (this.activityEvents.length > 0) return; // already loaded
-            this.activityLoading = true;
+            // Re-fetch on every tab click so new events appear without a
+            // full page refresh. Only show the skeleton on the first open;
+            // background refreshes don't flicker.
+            const firstLoad = this.activityEvents.length === 0;
+            if (firstLoad) this.activityLoading = true;
             this.activityPage = 1;
             try {
-                const res = await apiCall(`/api/workspaces/${this.workspaceId}/activity?page=1&per_page=30`);
+                const res = await apiCall(
+                    `/api/workspaces/${this.workspaceId}/activity?page=1&per_page=30`,
+                    'GET', null, { noCache: true },
+                );
                 this.activityEvents = res.events;
                 this.activityHasMore = res.has_more;
             } catch (e) {
-                showToast(e.message, 'error');
+                if (firstLoad) showToast(e.message, 'error');
             }
-            this.activityLoading = false;
+            if (firstLoad) this.activityLoading = false;
         },
 
         async loadMoreActivity() {
