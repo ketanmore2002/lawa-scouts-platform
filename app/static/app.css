@@ -1807,3 +1807,15 @@ select.input { cursor: pointer; }
 @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 @keyframes pulse-glow { 0%,100% { box-shadow: 0 0 6px rgba(16,185,129,.2); } 50% { box-shadow: 0 0 16px rgba(16,185,129,.5); } }
 @keyframes presence-ping { 0% { transform: scale(1); opacity: .4; } 75%,100% { transform: scale(2.2); opacity: 0; } }
+
+/* ══════════════════════════════════════
+   REPORT CHARTS GRID
+   ══════════════════════════════════════ */
+.report-charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+}
+.report-charts-grid > .card {
+    animation: fadeInUp .3s ease both;
+}

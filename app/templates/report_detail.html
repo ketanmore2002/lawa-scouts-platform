@@ -50,6 +50,23 @@
                         </div>
                     </template>
 
+                    <!-- Auto-inferred Charts -->
+                    <template x-if="charts.length > 0">
+                        <div class="report-charts-grid mb-24">
+                            <template x-for="(ch, ci) in charts" :key="ch.id">
+                                <div class="card card-body">
+                                    <div class="flex items-center justify-between mb-12" style="gap:8px;">
+                                        <p class="section-label" style="margin:0;" x-text="ch.title"></p>
+                                        <span class="mono-label" x-text="chartSubtitle(ch)"></span>
+                                    </div>
+                                    <div style="position:relative;height:240px;width:100%;">
+                                        <canvas :id="'report-chart-' + ch.id"></canvas>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
                     <!-- Controls -->
                     <div class="flex flex-wrap items-center gap-12 mb-20">
                         <div style="position:relative;flex:1 1 200px;min-width:0;">
@@ -184,6 +201,9 @@ function reportDetail(scoutId, reportId) {
         sortCol: null, sortDir: 1,
         activeFilters: {}, filterCols: [], filterOpts: {},
         citations: [],
+        charts: [],
+        _chartInstances: [],
+        _themeHandler: null,
 
         async init() {
             try {
@@ -205,9 +225,21 @@ function reportDetail(scoutId, reportId) {
                             this.filterOpts[col] = [...new Set(this.allRows.map(r => r[col]).filter(Boolean))].sort();
                         }
                     }
+                    this.charts = this._inferCharts();
                 }
             } catch (e) { showToast(e.message, 'error'); }
             this.loading = false;
+            if (this.isStructured && this.charts.length > 0) {
+                this.$nextTick(() => this.redrawCharts(true));
+                this._themeHandler = () => this.$nextTick(() => this.redrawCharts(true));
+                window.addEventListener('theme-changed', this._themeHandler);
+            }
+        },
+
+        destroy() {
+            this._chartInstances.forEach(c => { try { c.destroy(); } catch (e) {} });
+            this._chartInstances = [];
+            if (this._themeHandler) window.removeEventListener('theme-changed', this._themeHandler);
         },
 
         applyFilters() {
@@ -218,15 +250,256 @@ function reportDetail(scoutId, reportId) {
                 return true;
             });
             if (this.sortCol) this._doSort();
+            if (this.charts.length > 0) this.$nextTick(() => this.redrawCharts(false));
         },
-        resetFilters() { this.searchQuery = ''; for (const col of this.filterCols) this.activeFilters[col] = ''; this.sortCol = null; this.sortDir = 1; this.filteredRows = [...this.allRows]; },
+        resetFilters() { this.searchQuery = ''; for (const col of this.filterCols) this.activeFilters[col] = ''; this.sortCol = null; this.sortDir = 1; this.filteredRows = [...this.allRows]; if (this.charts.length > 0) this.$nextTick(() => this.redrawCharts(false)); },
         sortBy(col) { if (this.sortCol === col) this.sortDir *= -1; else { this.sortCol = col; this.sortDir = 1; } this._doSort(); },
         _doSort() { const col = this.sortCol, dir = this.sortDir; this.filteredRows.sort((a, b) => { let va = a[col], vb = b[col]; if (Array.isArray(va)) va = va.join(','); if (Array.isArray(vb)) vb = vb.join(','); va = String(va || '').toLowerCase(); vb = String(vb || '').toLowerCase(); return va < vb ? -dir : va > vb ? dir : 0; }); },
         getColLabel(key) { const c = this.sd && this.sd.columns.find(c => c.key === key); return c ? c.label : key; },
         statHex(color) { return ({ green:'#34d399', red:'#f87171', blue:'#818cf8', default:'#22d3ee' })[color] || '#22d3ee'; },
         badgeClass(value) { if (!value) return 'r-badge-default'; const p = ['r-badge-blue','r-badge-green','r-badge-purple','r-badge-amber','r-badge-rose','r-badge-cyan']; let h = 0; for (let i = 0; i < value.length; i++) h = value.charCodeAt(i) + ((h << 5) - h); return p[Math.abs(h) % p.length]; },
         formatTime(iso) { if (!iso) return ''; const d = new Date(iso); return d.toLocaleDateString('en-US', {month:'2-digit',day:'2-digit',year:'numeric'}) + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); },
-        formatMarkdown(text) { return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\[(.*?)\]\((https?:\/\/.*?)\)/g, '<a href="$2" target="_blank" style="color:var(--deep-teal);text-decoration:underline;">$1</a>').replace(/^- /gm, '&bull; ').replace(/\n/g, '<br>'); }
+        formatMarkdown(text) { return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\[(.*?)\]\((https?:\/\/.*?)\)/g, '<a href="$2" target="_blank" style="color:var(--deep-teal);text-decoration:underline;">$1</a>').replace(/^- /gm, '&bull; ').replace(/\n/g, '<br>'); },
+
+        // ───── Interactive charts inferred from structured_data ─────
+        _chartPalette: ['#10b981','#22d3ee','#a855f7','#818cf8','#f59e0b','#f87171','#34d399','#60a5fa','#f472b6','#fbbf24','#4ade80','#c084fc'],
+
+        _isNumeric(v) { if (v === null || v === undefined || v === '') return false; if (typeof v === 'number') return Number.isFinite(v); const n = Number(String(v).replace(/[,\s$%]/g, '')); return Number.isFinite(n); },
+        _toNumber(v) { if (typeof v === 'number') return v; return Number(String(v).replace(/[,\s$%]/g, '')); },
+        _parseDate(v) { if (!v) return null; const d = new Date(v); return isNaN(d.getTime()) ? null : d; },
+
+        _classifyColumn(col) {
+            const rows = this.allRows;
+            const vals = rows.map(r => r[col.key]).filter(v => v !== null && v !== undefined && v !== '');
+            if (vals.length === 0) return null;
+            if (col.type === 'tags') {
+                const flat = vals.flatMap(v => Array.isArray(v) ? v : [v]).filter(Boolean);
+                const distinct = new Set(flat);
+                if (distinct.size >= 2 && distinct.size <= 30) return { kind: 'tags', distinct: distinct.size };
+                return null;
+            }
+            if (col.type === 'date') {
+                const parsed = vals.map(v => this._parseDate(v)).filter(Boolean);
+                if (parsed.length >= Math.max(3, vals.length * 0.6)) return { kind: 'date' };
+                return null;
+            }
+            if (col.type === 'link') return null;
+            // Numeric detection
+            const numCount = vals.filter(v => this._isNumeric(v)).length;
+            if (numCount >= vals.length * 0.8 && numCount >= 3) {
+                const nums = vals.map(v => this._toNumber(v)).filter(Number.isFinite);
+                const distinct = new Set(nums).size;
+                if (distinct >= 3) return { kind: 'numeric' };
+            }
+            // Categorical
+            const distinct = new Set(vals.map(v => String(v))).size;
+            if (distinct >= 2 && distinct <= 12) return { kind: 'categorical', distinct };
+            if (col.type === 'badge' && distinct >= 2 && distinct <= 20) return { kind: 'categorical', distinct };
+            return null;
+        },
+
+        _inferCharts() {
+            if (!this.sd || !Array.isArray(this.sd.columns) || this.allRows.length < 2) return [];
+            const candidates = [];
+            for (const col of this.sd.columns) {
+                const c = this._classifyColumn(col);
+                if (!c) continue;
+                candidates.push({ col, ...c });
+            }
+            // Priority: date > categorical (prefer badge) > numeric
+            const priority = (c) => {
+                if (c.kind === 'date') return 0;
+                if (c.kind === 'categorical') return c.col.type === 'badge' ? 1 : 2;
+                if (c.kind === 'tags') return 1;
+                return 3;
+            };
+            candidates.sort((a, b) => priority(a) - priority(b));
+            const picks = candidates.slice(0, 3);
+            return picks.map((c, i) => ({
+                id: `${c.col.key}-${i}`,
+                key: c.col.key,
+                kind: c.kind,
+                title: c.kind === 'date' ? `${c.col.label} (over time)` :
+                       c.kind === 'numeric' ? `${c.col.label} distribution` :
+                       `By ${c.col.label}`,
+            }));
+        },
+
+        chartSubtitle(ch) {
+            return `${this.filteredRows.length} row${this.filteredRows.length === 1 ? '' : 's'}`;
+        },
+
+        _chartOptions(extra = {}) {
+            const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+            const gridColor = isLight ? 'rgba(0,0,0,.06)' : 'rgba(39,39,46,.6)';
+            const textColor = isLight ? '#5a5a72' : '#9898a8';
+            const tooltipBg = isLight ? '#ffffff' : '#18181f';
+            const tooltipBorder = isLight ? '#dfe1e6' : '#27272e';
+            return Object.assign({
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false, axis: 'x' },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: { color: textColor, font: { family: "'Inter', sans-serif", size: 11 }, boxWidth: 10, boxHeight: 10, padding: 10, usePointStyle: true, pointStyle: 'rectRounded' },
+                    },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: isLight ? '#1a1a24' : '#f5f5f7',
+                        bodyColor: textColor,
+                        borderColor: tooltipBorder,
+                        borderWidth: 1,
+                        padding: 10,
+                        cornerRadius: 8,
+                        titleFont: { family: "'Inter', sans-serif", size: 12, weight: '600' },
+                        bodyFont: { family: "'Inter', sans-serif", size: 12 },
+                        displayColors: true,
+                        boxPadding: 4,
+                        callbacks: {},
+                    },
+                },
+                scales: {
+                    x: { grid: { color: gridColor, drawBorder: false }, ticks: { color: textColor, padding: 6, font: { family: "'Inter', sans-serif", size: 10 } } },
+                    y: { beginAtZero: true, grid: { color: gridColor, drawBorder: false }, ticks: { color: textColor, padding: 6, precision: 0, font: { family: "'Inter', sans-serif", size: 10 } } },
+                },
+            }, extra);
+        },
+
+        _categoricalData(ch) {
+            const counts = new Map();
+            const isTags = ch.kind === 'tags';
+            for (const row of this.filteredRows) {
+                const v = row[ch.key];
+                if (v === null || v === undefined || v === '') continue;
+                if (isTags && Array.isArray(v)) {
+                    for (const t of v) if (t) counts.set(String(t), (counts.get(String(t)) || 0) + 1);
+                } else {
+                    const k = String(v);
+                    counts.set(k, (counts.get(k) || 0) + 1);
+                }
+            }
+            const entries = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
+            return { labels: entries.map(e => e[0]), values: entries.map(e => e[1]) };
+        },
+
+        _numericData(ch) {
+            const nums = this.filteredRows.map(r => this._toNumber(r[ch.key])).filter(Number.isFinite);
+            if (nums.length === 0) return { labels: [], values: [] };
+            const min = Math.min(...nums), max = Math.max(...nums);
+            if (min === max) return { labels: [String(min)], values: [nums.length] };
+            const binCount = Math.min(8, Math.max(4, Math.round(Math.sqrt(nums.length))));
+            const step = (max - min) / binCount;
+            const bins = Array(binCount).fill(0);
+            for (const n of nums) {
+                let idx = Math.floor((n - min) / step);
+                if (idx >= binCount) idx = binCount - 1;
+                bins[idx]++;
+            }
+            const fmt = (n) => Math.abs(n) >= 1000 ? n.toFixed(0) : Math.abs(n) >= 10 ? n.toFixed(1) : n.toFixed(2);
+            const labels = bins.map((_, i) => `${fmt(min + i * step)}–${fmt(min + (i + 1) * step)}`);
+            return { labels, values: bins };
+        },
+
+        _dateData(ch) {
+            const counts = new Map();
+            for (const row of this.filteredRows) {
+                const d = this._parseDate(row[ch.key]);
+                if (!d) continue;
+                const key = d.toISOString().slice(0, 10);
+                counts.set(key, (counts.get(key) || 0) + 1);
+            }
+            const sorted = [...counts.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1);
+            return { labels: sorted.map(e => e[0].slice(5)), values: sorted.map(e => e[1]) };
+        },
+
+        _buildChart(ch, animate) {
+            const canvas = document.getElementById(`report-chart-${ch.id}`);
+            if (!canvas || typeof Chart === 'undefined') return null;
+            const opts = this._chartOptions({ animation: animate ? { duration: 350 } : false });
+            if (ch.kind === 'date') {
+                const { labels, values } = this._dateData(ch);
+                opts.plugins.tooltip.callbacks.label = (ctx) => `${ctx.parsed.y} row${ctx.parsed.y === 1 ? '' : 's'}`;
+                return new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: 'Rows',
+                            data: values,
+                            borderColor: this._chartPalette[0],
+                            backgroundColor: 'rgba(16,185,129,.12)',
+                            borderWidth: 2, tension: 0.35, fill: true,
+                            pointBackgroundColor: this._chartPalette[0],
+                            pointRadius: 3, pointHoverRadius: 6, pointHoverBorderWidth: 2,
+                        }],
+                    },
+                    options: opts,
+                });
+            }
+            if (ch.kind === 'numeric') {
+                const { labels, values } = this._numericData(ch);
+                opts.plugins.tooltip.callbacks.label = (ctx) => `${ctx.parsed.y} row${ctx.parsed.y === 1 ? '' : 's'}`;
+                return new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: 'Count',
+                            data: values,
+                            backgroundColor: 'rgba(34,211,238,.35)',
+                            borderColor: this._chartPalette[1],
+                            borderWidth: 1, borderRadius: 4, hoverBackgroundColor: 'rgba(34,211,238,.6)',
+                        }],
+                    },
+                    options: opts,
+                });
+            }
+            // categorical / tags → build a synthetic multi-dataset so legend clicks toggle categories
+            const { labels, values } = this._categoricalData(ch);
+            const total = values.reduce((a, b) => a + b, 0) || 1;
+            const palette = this._chartPalette;
+            const datasets = labels.map((lbl, i) => {
+                const arr = Array(labels.length).fill(null);
+                arr[i] = values[i];
+                return {
+                    label: lbl,
+                    data: arr,
+                    backgroundColor: palette[i % palette.length],
+                    borderColor: palette[i % palette.length],
+                    borderWidth: 0,
+                    borderRadius: 4,
+                    barPercentage: 0.9,
+                    categoryPercentage: 0.9,
+                };
+            });
+            opts.plugins.tooltip.callbacks.label = (ctx) => {
+                const v = ctx.parsed.y;
+                const pct = ((v / total) * 100).toFixed(1);
+                return `${ctx.dataset.label}: ${v} row${v === 1 ? '' : 's'} (${pct}%)`;
+            };
+            opts.plugins.tooltip.filter = (item) => item.parsed.y !== null;
+            opts.scales.x.stacked = true;
+            opts.scales.y.stacked = true;
+            return new Chart(canvas, {
+                type: 'bar',
+                data: { labels, datasets },
+                options: opts,
+            });
+        },
+
+        redrawCharts(animate) {
+            this._chartInstances.forEach(c => { try { c.destroy(); } catch (e) {} });
+            this._chartInstances = [];
+            if (typeof Chart === 'undefined') return;
+            Chart.defaults.font.family = "'Inter', sans-serif";
+            Chart.defaults.font.size = 11;
+            for (const ch of this.charts) {
+                const inst = this._buildChart(ch, !!animate);
+                if (inst) this._chartInstances.push(inst);
+            }
+        }
     }
 }
 </script>
