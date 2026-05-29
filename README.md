@@ -6,7 +6,7 @@ LAWA Scouts is an AI-powered research platform that continuously monitors the we
 
 ## Demo
 
-▶️ **[Watch the demo video](https://github.com/ketanmore2002/lawa-scouts-platform/releases/download/v1.0.0/demo.mp4)**
+▶️ **[Click here to watch the demo video](https://github.com/ketanmore2002/lawa-scouts-platform/releases/download/v1.0.0/demo.mp4)** _(opens an MP4 video showing the app in action)_
 
 ---
 
