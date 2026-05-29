@@ -4,6 +4,10 @@
 
 LAWA Scouts is an AI-powered research platform that continuously monitors the web for topics you care about. Define a scout — a topic like "AI startups raising Series A" or "remote Rust developer jobs in Europe" — and the platform dispatches multiple AI agents in parallel to search, compile, and structure findings into an interactive report with charts, tables, filters, and downloadable exports.
 
+## Demo
+
+https://github.com/ketanmore2002/lawa-scouts-platform/releases/download/v1.0.0/Screen.Recording.2026-05-30.at.1.49.17.AM.mov
+
 ---
 
 ## The Problem
